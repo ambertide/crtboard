@@ -7,11 +7,18 @@
 //
 // The card reads the server's state once with get_state, then follows the
 // "pi-state" realtime channel. The board picture stays after the connection
-// drops; CPU and memory show only while connected.
+// drops; CPU and memory show only while connected. Restart and Shut down ask
+// for a second click before the server runs them on the Pi.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server";
-import { PI_STATE_CHANNEL, piStateSchema, type PiState, type PiStats } from "./state";
+import {
+  PI_STATE_CHANNEL,
+  piStateSchema,
+  type PiState,
+  type PiStats,
+  type PowerAction,
+} from "./state";
 import { BoardPicture } from "./board";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -132,6 +139,84 @@ function Stats({ stats }: { stats: PiStats }) {
   );
 }
 
+/** How long a Restart / Shut down click waits for its confirming click. */
+const CONFIRM_MS = 5000;
+
+const POWER_LABELS: Record<PowerAction, { button: string; icon: string; done: string }> = {
+  reboot: { button: "Restart", icon: "RotateCcw", done: "Restart sent" },
+  poweroff: { button: "Shut down", icon: "Power", done: "Shutdown sent" },
+};
+
+function PowerControls({ hostname }: { hostname: string }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const [confirming, setConfirming] = useState<PowerAction | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (confirming === null) return;
+    const timer = setTimeout(() => setConfirming(null), CONFIRM_MS);
+    return () => clearTimeout(timer);
+  }, [confirming]);
+
+  const send = (action: PowerAction) => {
+    setBusy(true);
+    setError(null);
+    rpc
+      .call("power", { action })
+      .then(
+        (result) => {
+          if (!result.ok) setError(result.error ?? "The command failed.");
+        },
+        (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+      )
+      .finally(() => {
+        setBusy(false);
+        setConfirming(null);
+      });
+  };
+
+  return (
+    <div className="space-y-1.5">
+      {confirming !== null ? (
+        <div className="flex items-center gap-2">
+          <span className="min-w-0 flex-1">
+            {confirming === "reboot"
+              ? `Restart ${hostname}?`
+              : `Shut down ${hostname}? It stays off until powered on by hand.`}
+          </span>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirming(null)}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="destructive" disabled={busy} onClick={() => send(confirming)}>
+            {busy ? "Sending…" : POWER_LABELS[confirming].button}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          {(["reboot", "poweroff"] as const).map((action) => (
+            <Button
+              key={action}
+              size="sm"
+              variant="outline"
+              className="flex-1 gap-1.5"
+              onClick={() => setConfirming(action)}
+            >
+              <Icon name={POWER_LABELS[action].icon} className="size-3.5" />
+              {POWER_LABELS[action].button}
+            </Button>
+          ))}
+        </div>
+      )}
+      {error !== null ? (
+        <div className="max-h-16 select-text overflow-auto break-words text-red-600 dark:text-red-400">
+          {error}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Whether the card is expanded, shared by the card and the footer action. */
 const expandedStore = (() => {
   const key = "bb-plugin-pi-state:expanded";
@@ -203,7 +288,7 @@ function PiCard() {
         className="fixed bottom-3 right-3 z-40 flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs shadow-lg hover:bg-muted"
       >
         {dot}
-        <span className="font-medium">Pi</span>
+        <span className="max-w-32 truncate font-medium">{device?.hostname || "Pi"}</span>
         <span className="text-muted-foreground">
           {cpu != null ? `CPU ${cpu.toFixed(0)}%` : status.tone === "live" ? "Live" : status.text}
         </span>
@@ -270,8 +355,22 @@ function PiCard() {
               <Icon name="Activity" className="size-3.5" />
               <span>Heartbeat {formatDuration(now - Date.parse(connection.lastSeen))} ago</span>
             </div>
+            <PowerControls hostname={device?.hostname || "the Pi"} />
           </>
-        ) : connection?.kind === "disconnected" ? (
+        ) : null}
+
+        {state?.power && connection?.kind !== "connected" ? (
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <Icon name={POWER_LABELS[state.power.action].icon} className="size-3.5" />
+            <span>
+              {POWER_LABELS[state.power.action].done}{" "}
+              {formatDuration(now - Date.parse(state.power.at))} ago
+              {state.power.action === "reboot" ? " · waiting for it to come back" : ""}
+            </span>
+          </div>
+        ) : null}
+
+        {connection?.kind === "disconnected" ? (
           <div className="space-y-2">
             <div className="max-h-20 select-text overflow-auto break-words text-red-600 dark:text-red-400">
               {connection.error}

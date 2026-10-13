@@ -37,6 +37,8 @@ export const connectionSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+export const powerActionSchema = z.enum(["reboot", "poweroff"]);
+
 export const piStateSchema = z.object({
   /** user@host[:port] the plugin connects to. */
   target: z.string(),
@@ -45,9 +47,12 @@ export const piStateSchema = z.object({
   device: deviceSchema.nullable(),
   /** Latest sample; null unless connected. */
   stats: statsSchema.nullable(),
+  /** A restart or shutdown sent from the panel; cleared on the next connect. */
+  power: z.object({ action: powerActionSchema, at: z.string() }).nullable(),
 });
 
 export type PiDevice = z.infer<typeof deviceSchema>;
 export type PiStats = z.infer<typeof statsSchema>;
 export type PiConnection = z.infer<typeof connectionSchema>;
 export type PiState = z.infer<typeof piStateSchema>;
+export type PowerAction = z.infer<typeof powerActionSchema>;
