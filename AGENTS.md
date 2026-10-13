@@ -2,3 +2,4 @@
 * Make your commits using conventional commits, for instance feat(helpers): ...
 * Branch names must be conventional also, for instance feat/SCOPE/DESC
 * Push the branch and create a PR with a summarised explonation, do not merge your commits yourself.
+* Do NOT add `Co-Authored-By:` trailers to commits; the `Assisted-by:` line is the only attribution.
