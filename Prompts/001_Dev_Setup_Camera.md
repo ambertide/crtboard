@@ -1,0 +1,1 @@
+/bb-plugin-authoring create a plugin that shows a camera feed, camera feed will always be on, however the agent will also be able to take pictures from this camera, when the agent takes a picture there should be an indicator
