@@ -2,8 +2,9 @@ Watch a Raspberry Pi from the BB sidebar.
 
 ## What you get
 
-- A Raspberry Pi panel at the bottom-left of the sidebar (the CPU icon in the
-  sidebar footer opens it).
+- A Raspberry Pi card in the bottom-right corner of the window, visible next
+  to the Camera panel. Click its header, or the CPU icon in the sidebar
+  footer, to collapse it to a small status pill.
 - A drawing of the connected board model. It stays, greyed out, after the
   connection drops.
 - A live connection indicator with uptime and a heartbeat every 2 seconds.

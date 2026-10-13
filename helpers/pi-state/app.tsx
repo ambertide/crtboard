@@ -1,10 +1,14 @@
 // bb-plugin-pi-state — frontend entry.
 //
-// A "Raspberry Pi" panel at the bottom of the left sidebar (a sidebar-footer
-// disclosure). It reads the server's state once with get_state, then follows
-// the "pi-state" realtime channel. The board picture stays after the
-// connection drops; CPU and memory show only while connected.
-import { useCallback, useEffect, useState } from "react";
+// A floating "Raspberry Pi" card in the bottom-right corner of every window
+// (an app overlay), so it stays visible next to sidebar-footer panels such as
+// the camera; BB opens only one footer disclosure at a time. It collapses to
+// a status pill; the CPU icon in the sidebar footer toggles it too.
+//
+// The card reads the server's state once with get_state, then follows the
+// "pi-state" realtime channel. The board picture stays after the connection
+// drops; CPU and memory show only while connected.
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server";
 import { PI_STATE_CHANNEL, piStateSchema, type PiState, type PiStats } from "./state";
@@ -128,7 +132,36 @@ function Stats({ stats }: { stats: PiStats }) {
   );
 }
 
-function PiPanel() {
+/** Whether the card is expanded, shared by the card and the footer action. */
+const expandedStore = (() => {
+  const key = "bb-plugin-pi-state:expanded";
+  let expanded = (() => {
+    try {
+      return localStorage.getItem(key) !== "false";
+    } catch {
+      return true;
+    }
+  })();
+  const listeners = new Set<() => void>();
+  return {
+    get: () => expanded,
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    toggle() {
+      expanded = !expanded;
+      try {
+        localStorage.setItem(key, String(expanded));
+      } catch {
+        // Private mode: keep the in-memory value.
+      }
+      for (const listener of listeners) listener();
+    },
+  };
+})();
+
+function PiCard() {
   const { state, error, reconnect } = usePiState();
   const now = useNow();
   const connection = state?.connection;
@@ -143,27 +176,61 @@ function PiPanel() {
           ? { tone: "pending", text: connection.attempt > 0 ? `Reconnecting (attempt ${connection.attempt + 1})…` : "Connecting…" }
           : { tone: "down", text: "Disconnected" };
 
+  const expanded = useSyncExternalStore(expandedStore.subscribe, expandedStore.get);
+  const dot = (
+    <span
+      aria-hidden
+      className={cn(
+        "size-2 shrink-0 rounded-full",
+        status.tone === "live"
+          ? "animate-pulse bg-emerald-500"
+          : status.tone === "pending"
+            ? "bg-amber-500"
+            : status.tone === "down"
+              ? "bg-red-500"
+              : "bg-muted-foreground",
+      )}
+    />
+  );
+
+  if (!expanded) {
+    const cpu = connection?.kind === "connected" ? state?.stats?.cpuPercent : null;
+    return (
+      <button
+        type="button"
+        onClick={expandedStore.toggle}
+        aria-label={`Raspberry Pi: ${status.text}. Show details`}
+        className="fixed bottom-3 right-3 z-40 flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-xs shadow-lg hover:bg-muted"
+      >
+        {dot}
+        <span className="font-medium">Pi</span>
+        <span className="text-muted-foreground">
+          {cpu != null ? `CPU ${cpu.toFixed(0)}%` : status.tone === "live" ? "Live" : status.text}
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <div role="region" aria-label="Raspberry Pi state" className="text-xs">
-      <div className="flex items-center gap-2 px-2.5 py-1.5">
-        <span
-          aria-hidden
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            status.tone === "live"
-              ? "animate-pulse bg-emerald-500"
-              : status.tone === "pending"
-                ? "bg-amber-500"
-                : status.tone === "down"
-                  ? "bg-red-500"
-                  : "bg-muted-foreground",
-          )}
-        />
+    <div
+      role="region"
+      aria-label="Raspberry Pi state"
+      className="fixed bottom-3 right-3 z-40 w-72 overflow-hidden rounded-lg border bg-background text-xs shadow-lg"
+    >
+      <button
+        type="button"
+        onClick={expandedStore.toggle}
+        aria-expanded
+        aria-label="Collapse Raspberry Pi card"
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left hover:bg-muted/60"
+      >
+        {dot}
         <span className="font-medium">Raspberry Pi</span>
         <span className="min-w-0 flex-1 truncate text-right text-muted-foreground" role="status">
           {status.text}
         </span>
-      </div>
+        <Icon name="ChevronDown" className="size-3.5 shrink-0 text-muted-foreground" />
+      </button>
 
       <div className="space-y-2.5 px-2.5 pb-2.5">
         {device !== null ? (
@@ -227,11 +294,12 @@ function PiPanel() {
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "pi-state-card", component: PiCard });
   app.experimental_sidebarFooter.register({
-    kind: "disclosure",
+    kind: "action",
     id: "pi-state",
     label: "Raspberry Pi",
     icon: "Cpu",
-    component: PiPanel,
+    onActivate: expandedStore.toggle,
   });
 });

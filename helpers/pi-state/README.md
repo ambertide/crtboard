@@ -12,7 +12,9 @@ A BB plugin that shows the state of a Raspberry Pi in a sidebar panel.
   The last device seen per target is stored in `bb.storage.kv`.
 - `state.ts` — the zod schema of the state the server publishes on the
   `pi-state` realtime channel and returns from the `get_state` RPC.
-- `app.tsx` — the panel, an `experimental_sidebarFooter` disclosure.
+- `app.tsx` — a floating card in the bottom-right corner (an
+  `experimental_appOverlay`) that collapses to a status pill. The CPU icon in
+  the sidebar footer (an `experimental_sidebarFooter` action) toggles it too.
 - `board.tsx` — SVG drawings of the board families (Pi 5, 4, 3, 3 A+,
   Zero, 400/500, Compute Module), picked from the reported model string.
 
@@ -41,5 +43,6 @@ bb plugin dev
 bb plugin logs pi-state -f
 ```
 
-BB keeps only one sidebar-footer disclosure open at a time, so opening this
-panel closes the Camera panel and vice versa.
+The card floats instead of using a sidebar-footer disclosure because BB keeps
+only one disclosure open at a time; this way it shows next to the Camera
+panel.
