@@ -14,6 +14,9 @@
 // exponential backoff. The last device seen at each target is kept in
 // bb.storage so the panel can show its picture while disconnected.
 //
+// The panel's Restart and Shut down buttons run `sudo -n systemctl reboot` or
+// `poweroff` over a separate ssh exec; this needs passwordless sudo on the Pi.
+//
 // Every state change is published on the "pi-state" realtime channel; a newly
 // opened panel reads the current state with the get_state RPC.
 import { spawn } from "node:child_process";
@@ -23,8 +26,10 @@ import { z } from "zod";
 import {
   PI_STATE_CHANNEL,
   piStateSchema,
+  powerActionSchema,
   type PiDevice,
   type PiState,
+  type PowerAction,
 } from "./state";
 
 const BACKOFF_BASE_MS = 1000;
@@ -34,6 +39,7 @@ const STALE_MS = 15_000;
 /** Covers ssh's ConnectTimeout plus authentication. */
 const FIRST_LINE_TIMEOUT_MS = 25_000;
 const MAX_STDERR_CHARS = 4000;
+const POWER_TIMEOUT_MS = 20_000;
 
 const REMOTE_SCRIPT = `
 model=$(tr -d '\\000' < /proc/device-tree/model 2>/dev/null)
@@ -61,6 +67,30 @@ type Target = { host: string; username: string; port: number };
 
 function targetLabel({ host, username, port }: Target) {
   return `${username}@${host}${port === 22 ? "" : `:${port}`}`;
+}
+
+function sshArgs(target: Target, command: string) {
+  return [
+    "-T",
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=10",
+    "-o", "ServerAliveInterval=5",
+    "-o", "ServerAliveCountMax=3",
+    "-o", "StrictHostKeyChecking=accept-new",
+    "-o", "LogLevel=ERROR",
+    "-p", String(target.port),
+    "-l", target.username,
+    "--", target.host,
+    command,
+  ];
+}
+
+function lastLine(text: string) {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .at(-1);
 }
 
 function deviceKey(target: Target) {
@@ -97,6 +127,10 @@ export const rpcContract = defineRpcContract({
   reconnect: {
     input: z.object({}),
     output: z.object({ ok: z.boolean() }),
+  },
+  power: {
+    input: z.object({ action: powerActionSchema }),
+    output: z.object({ ok: z.boolean(), error: z.string().optional() }),
   },
 });
 
@@ -137,6 +171,7 @@ export default async function plugin(bb: BbPluginApi) {
     connection: { kind: "connecting", attempt: 0 },
     device: null,
     stats: null,
+    power: null,
   };
 
   function update(next: Partial<PiState>) {
@@ -190,23 +225,9 @@ export default async function plugin(bb: BbPluginApi) {
     signal: AbortSignal,
   ): Promise<{ connected: boolean; error: string }> {
     return new Promise((resolve) => {
-      const child = spawn(
-        "ssh",
-        [
-          "-T",
-          "-o", "BatchMode=yes",
-          "-o", "ConnectTimeout=10",
-          "-o", "ServerAliveInterval=5",
-          "-o", "ServerAliveCountMax=3",
-          "-o", "StrictHostKeyChecking=accept-new",
-          "-o", "LogLevel=ERROR",
-          "-p", String(target.port),
-          "-l", target.username,
-          "--", target.host,
-          REMOTE_SCRIPT,
-        ],
-        { stdio: ["ignore", "pipe", "pipe"] },
-      );
+      const child = spawn("ssh", sshArgs(target, REMOTE_SCRIPT), {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
 
       let connected = false;
       let stalled = false;
@@ -256,6 +277,7 @@ export default async function plugin(bb: BbPluginApi) {
             bb.log.info(`connected to ${targetLabel(target)} (${model})`);
             update({
               connection: { kind: "connected", since: now, lastSeen: now },
+              power: null,
             });
             rememberDevice(target, model, rest.trim()).then(
               (device) => {
@@ -302,11 +324,7 @@ export default async function plugin(bb: BbPluginApi) {
         finish(`Could not run ssh: ${error.message}`);
       });
       child.on("close", (code, closeSignal) => {
-        const reason = stderr
-          .split("\n")
-          .map((line) => line.trim())
-          .filter(Boolean)
-          .at(-1);
+        const reason = lastLine(stderr);
         finish(
           stalled
             ? connected
@@ -384,11 +402,53 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  /** Runs `sudo -n systemctl <action>` on the Pi; resolves with an error or null. */
+  function runPowerCommand(target: Target, action: PowerAction) {
+    return new Promise<string | null>((resolve) => {
+      const child = spawn("ssh", sshArgs(target, `sudo -n systemctl ${action}`), {
+        stdio: ["ignore", "ignore", "pipe"],
+      });
+      let stderr = "";
+      child.stderr.setEncoding("utf8");
+      child.stderr.on("data", (chunk: string) => {
+        stderr = (stderr + chunk).slice(-MAX_STDERR_CHARS);
+      });
+      const timer = setTimeout(() => child.kill("SIGKILL"), POWER_TIMEOUT_MS);
+      child.on("error", (error) => {
+        clearTimeout(timer);
+        resolve(`Could not run ssh: ${error.message}`);
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        // The Pi may drop the connection before ssh reads the exit status.
+        if (code === 0 || /closed by remote host|connection reset/i.test(stderr)) {
+          resolve(null);
+        } else {
+          resolve(lastLine(stderr) ?? `ssh exited with code ${code}.`);
+        }
+      });
+    });
+  }
+
   bb.rpc.register(rpcContract, {
     get_state: () => state,
     reconnect: () => {
       if (wake === null) return { ok: false };
       wake();
+      return { ok: true };
+    },
+    power: async ({ action }) => {
+      if (state.connection.kind !== "connected") {
+        return { ok: false, error: "The Pi is not connected." };
+      }
+      const target = await readTarget();
+      bb.log.info(`sending ${action} to ${targetLabel(target)}`);
+      const error = await runPowerCommand(target, action);
+      if (error !== null) {
+        bb.log.warn(`${action} failed: ${error}`);
+        return { ok: false, error: error.slice(0, 500) };
+      }
+      update({ power: { action, at: new Date().toISOString() } });
       return { ok: true };
     },
   });

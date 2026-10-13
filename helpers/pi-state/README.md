@@ -10,6 +10,9 @@ A BB plugin that shows the state of a Raspberry Pi in a sidebar panel.
   silence, or when ssh exits, it reconnects with exponential backoff
   (1 s doubling to 60 s, ±20% jitter, reset after a successful connection).
   The last device seen per target is stored in `bb.storage.kv`.
+- The `power` RPC runs `sudo -n systemctl reboot|poweroff` over a separate
+  ssh exec (passwordless sudo required) and records it in the state until
+  the next successful connection.
 - `state.ts` — the zod schema of the state the server publishes on the
   `pi-state` realtime channel and returns from the `get_state` RPC.
 - `app.tsx` — a floating card in the bottom-right corner (an
