@@ -55,13 +55,19 @@ func main() {
 		}
 	}
 
+	// Log only changes, so a missing display does not flood the journal.
+	lastLog := "unset"
 	draw := func() {
+		msg := fmt.Sprintf("showing %s on %s", *imagePath, *fbPath)
 		if err := drawToFramebuffer(*fbPath, pattern); err != nil {
-			log.Print(err)
+			msg = err.Error()
+		}
+		if msg != lastLog {
+			log.Print(msg)
+			lastLog = msg
 		}
 	}
 	draw()
-	log.Printf("showing %s on %s", *imagePath, *fbPath)
 
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
