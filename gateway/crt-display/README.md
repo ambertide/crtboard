@@ -14,14 +14,9 @@ PI_USER=<user> PI_HOST=<host or ip> ./gateway/crt-display/deploy.sh
 ## Analog output
 
 The renderer draws to `/dev/fb0`, which only exists once a display output is
-enabled. The CRT is PAL (720x576, 50 Hz). To turn on the composite output on
-a Pi 4 with the KMS driver:
-
-- In `/boot/firmware/config.txt`, change `dtoverlay=vc4-kms-v3d` to
-  `dtoverlay=vc4-kms-v3d,composite` and add `enable_tvout=1`.
-- In `/boot/firmware/cmdline.txt`, add `video=Composite-1:720x576@50ie,tv_mode=PAL`.
-
-Then reboot. Until the framebuffer exists the service logs
+enabled. The CRT is PAL (720x576, 50 Hz); deploy
+[`display-config`](../display-config/README.md) to turn on the composite
+output. Until the framebuffer exists the service logs
 `open /dev/fb0: no such file or directory` and retries every 10 seconds.
 
 ## Notes
