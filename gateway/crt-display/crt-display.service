@@ -1,0 +1,14 @@
+[Unit]
+Description=CRT test pattern on the analog display
+# The pattern owns tty1, so keep the login prompt off it.
+Conflicts=getty@tty1.service
+After=getty@tty1.service systemd-user-sessions.service
+
+[Service]
+ExecStart=/usr/local/bin/crt-display -image /usr/local/share/crt-display/test.png
+# Root is needed for /dev/fb0 and to switch tty1 to graphics mode.
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
