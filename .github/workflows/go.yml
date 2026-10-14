@@ -1,0 +1,45 @@
+# Vets and builds crt-display for the Pi. It uses Linux-only framebuffer and
+# tty calls, so it is checked for the Pi's targets rather than the runner's.
+name: Go
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gateway/crt-display/**"
+      - ".github/workflows/go.yml"
+  pull_request:
+    paths:
+      - "gateway/crt-display/**"
+      - ".github/workflows/go.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  vet:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goarch: arm64
+          - goarch: arm
+            goarm: "6"
+    env:
+      GOOS: linux
+      GOARCH: ${{ matrix.goarch }}
+      GOARM: ${{ matrix.goarm }}
+      CGO_ENABLED: "0"
+    defaults:
+      run:
+        working-directory: gateway/crt-display
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: gateway/crt-display/go.mod
+          cache: false
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go vet ./...
+      - run: go build -o /dev/null .
