@@ -1,0 +1,12 @@
+[Unit]
+Description=USB serial gadget on the USB-C port
+After=sys-kernel-config.mount
+Requires=sys-kernel-config.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/crtboard-gadget
+
+[Install]
+WantedBy=multi-user.target
