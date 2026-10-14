@@ -4,12 +4,17 @@
 // It runs as a systemd service on boot. The console on the display's VT is
 // switched to graphics mode so the kernel stops drawing text and the cursor
 // over the picture, and is switched back to text mode on exit.
+//
+// With -serial it also accepts images over the USB serial gadget and shows
+// the latest one instead of the test pattern.
 package main
 
 import (
 	"flag"
 	"fmt"
 	"image"
+	_ "image/gif"
+	_ "image/jpeg"
 	_ "image/png"
 	"log"
 	"os"
@@ -34,6 +39,8 @@ func main() {
 	ttyPath := flag.String("tty", "/dev/tty1", "console VT to switch to graphics mode, empty to skip")
 	redraw := flag.Duration("redraw", 10*time.Second, "how often to redraw the pattern, 0 to draw once")
 	force := flag.Bool("force", false, "allow running from an SSH session")
+	serialPath := flag.String("serial", "", "serial device to receive images on, empty to disable")
+	uploadDir := flag.String("upload-dir", "/tmp/crt-display", "where received images are stored")
 	flag.Parse()
 
 	// Drawing from an SSH login takes the display away from the service.
@@ -55,10 +62,16 @@ func main() {
 		}
 	}
 
+	uploads := make(chan upload)
+	if *serialPath != "" {
+		go receiveUploads(*serialPath, *uploadDir, uploads)
+	}
+
 	// Log only changes, so a missing display does not flood the journal.
+	source := *imagePath
 	lastLog := "unset"
 	draw := func() {
-		msg := fmt.Sprintf("showing %s on %s", *imagePath, *fbPath)
+		msg := fmt.Sprintf("showing %s on %s", source, *fbPath)
 		if err := drawToFramebuffer(*fbPath, pattern); err != nil {
 			msg = err.Error()
 		}
@@ -83,6 +96,9 @@ func main() {
 		select {
 		case <-tick:
 			draw()
+		case u := <-uploads:
+			pattern, source = u.image, u.path
+			draw()
 		case sig := <-signals:
 			if sig == syscall.SIGHUP {
 				draw()
@@ -105,6 +121,11 @@ func loadGray(path string) (*image.Gray, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode %s: %w", path, err)
 	}
+	return toGray(src), nil
+}
+
+// toGray converts an image to 8-bit luminance.
+func toGray(src image.Image) *image.Gray {
 	b := src.Bounds()
 	gray := image.NewGray(image.Rect(0, 0, b.Dx(), b.Dy()))
 	for y := 0; y < b.Dy(); y++ {
@@ -114,7 +135,7 @@ func loadGray(path string) (*image.Gray, error) {
 			gray.Pix[y*gray.Stride+x] = uint8((299*r + 587*g + 114*bl) / 1000 >> 8)
 		}
 	}
-	return gray, nil
+	return gray
 }
 
 // graphicsMode stops the kernel console drawing on the VT and returns a

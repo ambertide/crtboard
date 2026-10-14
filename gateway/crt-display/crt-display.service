@@ -2,10 +2,11 @@
 Description=CRT test pattern on the analog display
 # The pattern owns tty1, so keep the login prompt off it.
 Conflicts=getty@tty1.service
-After=getty@tty1.service systemd-user-sessions.service
+After=getty@tty1.service systemd-user-sessions.service crtboard-gadget.service
 
 [Service]
-ExecStart=/usr/local/bin/crt-display -image /usr/local/share/crt-display/test.png
+# Uploaded images arrive over the USB serial gadget (gateway/usb-gadget).
+ExecStart=/usr/local/bin/crt-display -image /usr/local/share/crt-display/test.png -serial /dev/ttyGS0
 # Root is needed for /dev/fb0 and to switch tty1 to graphics mode.
 Restart=always
 RestartSec=2
