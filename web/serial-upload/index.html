@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CRT Board serial upload</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; }
+  section { margin-bottom: 1.5rem; }
+  #log { background: #f4f4f4; padding: 0.5rem; height: 12rem; overflow-y: auto; font-family: monospace; font-size: 0.85rem; white-space: pre-wrap; }
+  img { max-width: 100%; max-height: 12rem; display: block; margin-top: 0.5rem; }
+</style>
+</head>
+<body>
+<h1>CRT Board serial upload</h1>
+<p>Test page: connects to the Raspberry Pi over USB serial (WebSerial) and sends an image to show on the CRT.</p>
+
+<section>
+  <button id="connect">Connect</button>
+  <span id="status">Not connected</span>
+</section>
+
+<section>
+  <input type="file" id="file" accept="image/png,image/jpeg,image/gif">
+  <button id="upload" disabled>Upload</button>
+  <img id="preview" alt="" hidden>
+</section>
+
+<div id="log"></div>
+
+<script>
+// Protocol (gateway/crt-display/upload.go), one reply line per command:
+//   PING          -> PONG crt-display
+//   IMG <bytes>   -> READY, then send the file -> OK <w>x<h>
+// Failures are answered with ERR <reason>.
+
+// The Pi's USB gadget IDs (gateway/usb-gadget/crtboard-gadget.sh).
+const FILTERS = [{ usbVendorId: 0x1d6b, usbProductId: 0x0104 }];
+
+const $ = (id) => document.getElementById(id);
+let port, writer, reader, reading;
+let lines = [];
+let waiting = null;
+
+function log(text) {
+  $("log").textContent += text + "\n";
+  $("log").scrollTop = $("log").scrollHeight;
+}
+
+function setConnected(connected, text) {
+  $("status").textContent = text;
+  $("connect").textContent = connected ? "Disconnect" : "Connect";
+  $("upload").disabled = !connected || !$("file").files.length;
+}
+
+// Collects reply lines from the Pi and hands them to nextLine().
+async function readLoop(reader) {
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let i;
+      while ((i = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, i).trim();
+        buffer = buffer.slice(i + 1);
+        log("< " + line);
+        if (waiting) { const w = waiting; waiting = null; w(line); }
+        else lines.push(line);
+      }
+    }
+  } catch (e) {
+    log("read error: " + e.message);
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+function nextLine(timeoutMs = 10000) {
+  if (lines.length) return Promise.resolve(lines.shift());
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { waiting = null; reject(new Error("no reply from the Pi")); }, timeoutMs);
+    waiting = (line) => { clearTimeout(timer); resolve(line); };
+  });
+}
+
+async function send(data) {
+  if (typeof data === "string") {
+    log("> " + data.trim());
+    data = new TextEncoder().encode(data);
+  }
+  await writer.write(data);
+}
+
+async function connect() {
+  try {
+    port = await navigator.serial.requestPort({ filters: FILTERS });
+    // The gadget ignores the baud rate; WebSerial requires one.
+    await port.open({ baudRate: 115200 });
+    writer = port.writable.getWriter();
+    lines = [];
+    reader = port.readable.getReader();
+    reading = readLoop(reader);
+    setConnected(true, "Checking…");
+    await send("PING\n");
+    const reply = await nextLine(3000);
+    if (!reply.startsWith("PONG")) throw new Error("unexpected reply: " + reply);
+    setConnected(true, "Connected to the Pi");
+  } catch (e) {
+    log("connect failed: " + e.message);
+    await disconnect();
+  }
+}
+
+async function disconnect() {
+  try {
+    if (writer) { writer.releaseLock(); writer = null; }
+    if (reader) { await reader.cancel(); await reading; reader = null; }
+    if (port) await port.close();
+  } catch (e) {
+    log("close: " + e.message);
+  }
+  port = null;
+  setConnected(false, "Not connected");
+}
+
+async function upload() {
+  const file = $("file").files[0];
+  $("upload").disabled = true;
+  try {
+    const data = new Uint8Array(await file.arrayBuffer());
+    await send(`IMG ${data.length}\n`);
+    const ready = await nextLine();
+    if (ready !== "READY") throw new Error(ready);
+    log(`> (${data.length} bytes of ${file.name})`);
+    await send(data);
+    const result = await nextLine(30000);
+    if (!result.startsWith("OK")) throw new Error(result);
+    $("status").textContent = `Showing ${file.name} (${result.slice(3)})`;
+  } catch (e) {
+    log("upload failed: " + e.message);
+  } finally {
+    $("upload").disabled = !port;
+  }
+}
+
+if (!("serial" in navigator)) {
+  $("status").textContent = "This browser has no WebSerial; use Chrome or Edge.";
+  $("connect").disabled = true;
+}
+
+$("connect").onclick = () => (port ? disconnect() : connect());
+$("upload").onclick = upload;
+$("file").onchange = () => {
+  const file = $("file").files[0];
+  $("preview").hidden = !file;
+  if (file) $("preview").src = URL.createObjectURL(file);
+  $("upload").disabled = !port || !file;
+};
+navigator.serial?.addEventListener("disconnect", (e) => {
+  if (e.target === port) { log("device unplugged"); disconnect(); }
+});
+</script>
+</body>
+</html>
