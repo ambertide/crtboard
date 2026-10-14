@@ -159,8 +159,10 @@ func readScreen(fb *os.File, fbPath string) (screen, error) {
 	return s, nil
 }
 
-// drawToFramebuffer scales the pattern to fit the screen, centred with black
-// borders, and writes it in the framebuffer's pixel format.
+// drawToFramebuffer stretches the pattern over the whole screen and writes it
+// in the framebuffer's pixel format. Analog TV pixels are not square: a
+// 720x576 PAL or 720x480 NTSC frame already fills a 4:3 screen, so keeping
+// the image's pixel aspect would leave black bars.
 func drawToFramebuffer(fbPath string, pattern *image.Gray) error {
 	fb, err := os.OpenFile(fbPath, os.O_RDWR, 0)
 	if err != nil {
@@ -178,17 +180,13 @@ func drawToFramebuffer(fbPath string, pattern *image.Gray) error {
 	}
 
 	pw, ph := pattern.Rect.Dx(), pattern.Rect.Dy()
-	scale := min(float64(s.width)/float64(pw), float64(s.height)/float64(ph))
-	dw, dh := int(float64(pw)*scale), int(float64(ph)*scale)
-	ox, oy := (s.width-dw)/2, (s.height-dh)/2
-
 	buf := make([]byte, s.stride*s.height)
-	for y := 0; y < dh; y++ {
-		sy := min(int(float64(y)/scale), ph-1)
-		row := buf[(oy+y)*s.stride:]
-		for x := 0; x < dw; x++ {
-			sx := min(int(float64(x)/scale), pw-1)
-			putGray(row[(ox+x)*bytesPerPixel:], bytesPerPixel, pattern.Pix[sy*pattern.Stride+sx])
+	for y := 0; y < s.height; y++ {
+		sy := y * ph / s.height
+		row := buf[y*s.stride:]
+		for x := 0; x < s.width; x++ {
+			sx := x * pw / s.width
+			putGray(row[x*bytesPerPixel:], bytesPerPixel, pattern.Pix[sy*pattern.Stride+sx])
 		}
 	}
 
