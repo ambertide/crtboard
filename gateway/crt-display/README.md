@@ -1,7 +1,8 @@
 # crt-display
 
-Shows the monochrome CRT test pattern (`assets/test.png`) on the Raspberry Pi's
-analog output. It runs as the `crt-display` systemd service and starts on boot.
+Shows the Philips PM5540 PAL test pattern (`assets/PM5540.png`) in monochrome
+on the Raspberry Pi's analog output. It runs as the `crt-display` systemd
+service and starts on boot.
 
 ## Deploy
 
