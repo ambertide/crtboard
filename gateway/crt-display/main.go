@@ -41,7 +41,13 @@ func main() {
 	force := flag.Bool("force", false, "allow running from an SSH session")
 	serialPath := flag.String("serial", "", "serial device to receive images on, empty to disable")
 	uploadDir := flag.String("upload-dir", "/tmp/crt-display", "where received images are stored")
+	overscanFlag := flag.String("overscan", "0,0,0,0", "left,top,right,bottom margins in screen pixels hidden by the CRT bezel")
 	flag.Parse()
+
+	overscan, err := parseOverscan(*overscanFlag)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Drawing from an SSH login takes the display away from the service.
 	if !*force && (os.Getenv("SSH_CONNECTION") != "" || os.Getenv("SSH_TTY") != "") {
@@ -72,7 +78,7 @@ func main() {
 	lastLog := "unset"
 	draw := func() {
 		msg := fmt.Sprintf("showing %s on %s", source, *fbPath)
-		if err := drawToFramebuffer(*fbPath, pattern); err != nil {
+		if err := drawToFramebuffer(*fbPath, pattern, overscan); err != nil {
 			msg = err.Error()
 		}
 		if msg != lastLog {
@@ -180,11 +186,33 @@ func readScreen(fb *os.File, fbPath string) (screen, error) {
 	return s, nil
 }
 
-// drawToFramebuffer stretches the pattern over the whole screen and writes it
-// in the framebuffer's pixel format. Analog TV pixels are not square: a
-// 720x576 PAL or 720x480 NTSC frame already fills a 4:3 screen, so keeping
-// the image's pixel aspect would leave black bars.
-func drawToFramebuffer(fbPath string, pattern *image.Gray) error {
+// margins is how many screen pixels the CRT hides on each side.
+type margins struct {
+	left, top, right, bottom int
+}
+
+// parseOverscan reads margins written as "left,top,right,bottom".
+func parseOverscan(v string) (margins, error) {
+	parts := strings.Split(v, ",")
+	if len(parts) != 4 {
+		return margins{}, fmt.Errorf("overscan %q: want left,top,right,bottom", v)
+	}
+	var n [4]int
+	for i, p := range parts {
+		var err error
+		if n[i], err = strconv.Atoi(strings.TrimSpace(p)); err != nil || n[i] < 0 {
+			return margins{}, fmt.Errorf("overscan %q: %q is not a pixel count", v, p)
+		}
+	}
+	return margins{n[0], n[1], n[2], n[3]}, nil
+}
+
+// drawToFramebuffer stretches the pattern over the part of the screen the CRT
+// shows, leaves the overscan margins black, and writes it in the framebuffer's
+// pixel format. Analog TV pixels are not square: a 720x576 PAL or 720x480 NTSC
+// frame already fills a 4:3 screen, so keeping the image's pixel aspect would
+// leave black bars.
+func drawToFramebuffer(fbPath string, pattern *image.Gray, m margins) error {
 	fb, err := os.OpenFile(fbPath, os.O_RDWR, 0)
 	if err != nil {
 		return err
@@ -200,14 +228,19 @@ func drawToFramebuffer(fbPath string, pattern *image.Gray) error {
 		return fmt.Errorf("%s: unsupported %d bits per pixel", fbPath, s.bitsPerPixel)
 	}
 
+	w, h := s.width-m.left-m.right, s.height-m.top-m.bottom
+	if w <= 0 || h <= 0 {
+		return fmt.Errorf("overscan %+v leaves nothing of the %dx%d screen", m, s.width, s.height)
+	}
+
 	pw, ph := pattern.Rect.Dx(), pattern.Rect.Dy()
 	buf := make([]byte, s.stride*s.height)
-	for y := 0; y < s.height; y++ {
-		sy := y * ph / s.height
-		row := buf[y*s.stride:]
-		for x := 0; x < s.width; x++ {
-			sx := x * pw / s.width
-			putGray(row[x*bytesPerPixel:], bytesPerPixel, pattern.Pix[sy*pattern.Stride+sx])
+	for y := 0; y < h; y++ {
+		sy := y * ph / h
+		row := buf[(m.top+y)*s.stride:]
+		for x := 0; x < w; x++ {
+			sx := x * pw / w
+			putGray(row[(m.left+x)*bytesPerPixel:], bytesPerPixel, pattern.Pix[sy*pattern.Stride+sx])
 		}
 	}
 

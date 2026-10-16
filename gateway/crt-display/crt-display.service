@@ -6,7 +6,8 @@ After=getty@tty1.service systemd-user-sessions.service crtboard-gadget.service
 
 [Service]
 # Uploaded images arrive over the USB serial gadget (gateway/usb-gadget).
-ExecStart=/usr/local/bin/crt-display -image /usr/local/share/crt-display/test.png -serial /dev/ttyGS0
+# -overscan keeps the picture inside the part of the CRT that is visible.
+ExecStart=/usr/local/bin/crt-display -image /usr/local/share/crt-display/test.png -serial /dev/ttyGS0 -overscan 64,10,44,4
 # Root is needed for /dev/fb0 and to switch tty1 to graphics mode.
 Restart=always
 RestartSec=2

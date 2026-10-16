@@ -20,6 +20,15 @@ enabled. The CRT is PAL (720x576, 50 Hz); deploy
 output. Until the framebuffer exists the service logs
 `open /dev/fb0: no such file or directory` and retries every 10 seconds.
 
+## Overscan
+
+The CRT hides the edges of the frame, and this set shows the picture right of
+centre. The service passes `-overscan 64,10,44,4` (left, top, right, bottom
+pixels), so images are fitted into the visible 612x562 area and the margins
+are left black. The values were found by showing the PM5540 pattern and
+growing each margin until its outer border sat flush with the glass. Without
+the flag the whole 720x576 frame is used.
+
 ## Uploading images
 
 The service listens on `/dev/ttyGS0`, the USB serial port that
