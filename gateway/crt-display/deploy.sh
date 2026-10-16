@@ -10,7 +10,7 @@ set -euo pipefail
 PI_PORT="${PI_PORT:-22}"
 
 here="$(cd "$(dirname "$0")" && pwd)"
-image="$here/../../assets/test.png"
+image="$here/../../assets/PM5540.png"
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=10 -p "$PI_PORT")
 target="$PI_USER@$PI_HOST"
 
@@ -37,7 +37,7 @@ scp -q -o BatchMode=yes -P "$PI_PORT" \
 echo "Installing service"
 ssh "${ssh_opts[@]}" "$target" "set -e
   sudo -n install -m 755 $remote_dir/crt-display /usr/local/bin/crt-display
-  sudo -n install -D -m 644 $remote_dir/test.png /usr/local/share/crt-display/test.png
+  sudo -n install -D -m 644 $remote_dir/PM5540.png /usr/local/share/crt-display/test.png
   sudo -n install -m 644 $remote_dir/crt-display.service /etc/systemd/system/crt-display.service
   rm -rf $remote_dir
   sudo -n systemctl daemon-reload
