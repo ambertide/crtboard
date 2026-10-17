@@ -32,7 +32,13 @@ const repos = {
   crtboard: { PRs: 2, todaysMergedPRs: 0, branch: "main", reviewRequested: 1 },
 };
 const columnTasks = { TO_DO: 7, BLOCKED: 0, IN_PROGRESS: 0, DONE: 5 };
-const BRANCHES = ["main", "feat/crt/flash-changes", "fix/serial/reconnect", "chore/deps/bump-vite"];
+const BRANCHES = [
+  "main",
+  "feat/crt/flash-changes",
+  "fix/serial/reconnect",
+  "chore/deps/bump-vite",
+  "feature/tokenizer/add-support-for-very-long-load-instructions-in-the-assembler",
+];
 
 /** One random change, so the dashboard has something to flash about. */
 function mutate() {
