@@ -27,9 +27,9 @@ const tracked = { git: new Map(), asana: new Map() };
 let nextId = 1;
 
 const repos = {
-  beemu: { PRs: 4, branch: "feat/tokenizer/add-ld-instructions", reviewRequested: 0 },
-  basehieroglpyh: { PRs: 9, branch: "feat/package/cats-are-here", reviewRequested: 7 },
-  crtboard: { PRs: 2, branch: "main", reviewRequested: 1 },
+  beemu: { PRs: 4, todaysMergedPRs: 0, branch: "feat/tokenizer/add-ld-instructions", reviewRequested: 0 },
+  basehieroglpyh: { PRs: 9, todaysMergedPRs: 1, branch: "feat/package/cats-are-here", reviewRequested: 7 },
+  crtboard: { PRs: 2, todaysMergedPRs: 0, branch: "main", reviewRequested: 1 },
 };
 const columnTasks = { TO_DO: 7, BLOCKED: 0, IN_PROGRESS: 0, DONE: 5 };
 const BRANCHES = ["main", "feat/crt/flash-changes", "fix/serial/reconnect", "chore/deps/bump-vite"];
@@ -44,6 +44,7 @@ function mutate() {
     () => (repo.reviewRequested += 1),
     () => (repo.reviewRequested = Math.max(0, repo.reviewRequested - 1)),
     () => (repo.PRs += 1),
+    () => (repo.todaysMergedPRs += 1),
     () => (repo.branch = BRANCHES[Math.floor(Math.random() * BRANCHES.length)]),
     () => (columnTasks.TO_DO += 1),
     () => (columnTasks[column] = Math.max(0, columnTasks[column] + (Math.random() < 0.5 ? -1 : 1))),

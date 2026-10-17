@@ -97,11 +97,13 @@ class Dashboard {
         statusFlash: tracker.arrived ? null : continuousFlashPhase(clock.now),
       };
     }
+    const status = this.#status;
     return {
       kind: "normal",
-      status: this.#status,
+      status,
       advice: this.#advice,
-      statusFlash: this.#flash("status"),
+      // Raised statuses flash for as long as they are held; Nominal only when it returns.
+      statusFlash: status === "nominal" ? this.#flash("status") : continuousFlashPhase(clock.now),
       adviceFlash: this.#flash("advice"),
     };
   });

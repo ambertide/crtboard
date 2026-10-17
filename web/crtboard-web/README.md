@@ -46,14 +46,16 @@ makes the mock change something right away, to watch the dashboard flash.
 - Uploading an image shows the test card for 3 seconds, then the image until
   Stop, then the test card again before the dashboard returns.
 - Status priority: repeating event, Review Requested, Pull Request Created,
-  Merged, Task Created, Nominal. A status stays for 10 minutes after the
-  change that raised it. `CRTBOARD_EVENT_SUM` carries no merge signal, so
-  Merged is never raised yet.
+  Merged, Task Created, Nominal. They are raised when, between two
+  `CRTBOARD_EVENT_SUM` events, a tracked repository's `reviewRequested`,
+  `PRs` or `todaysMergedPRs` rises, or the To Do column (still matched to the
+  same Asana column) gains tasks. A raised status stays, flashing, for 5
+  minutes.
 - A repeating event appears 10 minutes before it starts, flashing, with a
   `t - 08M 06S` style countdown, and stays steady for 10 minutes after.
-- When a status, the deployment advice, a review-request count, a branch or a
-  task count changes, it flashes gray-50/gray-400, a second each, for six
-  seconds. The clock and the countdown never flash.
+- When Nominal returns, or the deployment advice, a review-request count, a
+  branch or a task count changes, it flashes gray-50/gray-400, a second
+  each, for six seconds. The clock and the countdown never flash.
 - The deployment advice under Nominal follows [Prompts/011_Deploys.md](../../Prompts/011_Deploys.md):
   Ready Monday to Thursday 06:00–16:30; Avoid 04:00–06:00 and 16:30–20:30 on
   those days and Friday 04:00–12:00; Do Not Deploy otherwise.

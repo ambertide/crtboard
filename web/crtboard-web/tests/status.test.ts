@@ -4,9 +4,9 @@ import type { EventSum } from "../src/features/connector/types.ts";
 import { continuousFlashPhase, flashPhase } from "../src/features/crt-screen/flash.ts";
 import { STATUS_HOLD_MS, currentStatus, detectStatusEvents } from "../src/features/crt-screen/status.ts";
 
-function sum(reviewRequested: number, PRs: number, todo: number, todoColumn = "Will Do"): EventSum {
+function sum(reviewRequested: number, PRs: number, todo: number, todoColumn = "Will Do", todaysMergedPRs = 0): EventSum {
   return {
-    gitRepos: { beemu: { PRs, branch: "main", reviewRequested } },
+    gitRepos: { beemu: { PRs, todaysMergedPRs, branch: "main", reviewRequested } },
     asanaBoards: { todo: { matchedColumnName: todoColumn, tasks: todo } },
   };
 }
@@ -21,6 +21,11 @@ test("statuses expire after the hold time", () => {
   const events = detectStatusEvents(sum(0, 1, 3), sum(0, 2, 3), 0);
   assert.equal(currentStatus(events, STATUS_HOLD_MS - 1), "new-pr");
   assert.equal(currentStatus(events, STATUS_HOLD_MS), "nominal");
+});
+
+test("a rise in today's merged PRs is a merge; the daily reset is not", () => {
+  assert.equal(currentStatus(detectStatusEvents(sum(0, 1, 3, "Will Do", 0), sum(0, 1, 3, "Will Do", 1), 0), 1), "merged");
+  assert.equal(currentStatus(detectStatusEvents(sum(0, 1, 3, "Will Do", 4), sum(0, 1, 3, "Will Do", 0), 0), 1), "nominal");
 });
 
 test("only new tasks in the same column count as created", () => {

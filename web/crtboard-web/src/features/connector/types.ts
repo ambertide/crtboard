@@ -35,6 +35,7 @@ export interface TrackedBoardBody {
 
 export interface RepoSummary {
   PRs: number;
+  todaysMergedPRs: number;
   branch: string;
   reviewRequested: number;
 }

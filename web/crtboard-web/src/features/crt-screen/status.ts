@@ -14,8 +14,8 @@ export const STATUS_LABELS: Record<StatusType, string> = {
 /** Most important first: a review request outranks a newly opened PR. */
 const PRIORITY: StatusType[] = ["review-requested", "new-pr", "merged", "task-created"];
 
-/** How long a status stays on the CRT after the change that raised it. */
-export const STATUS_HOLD_MS = 10 * 60_000;
+/** How long a status stays, flashing, on the CRT after the change that raised it. */
+export const STATUS_HOLD_MS = 5 * 60_000;
 
 export interface StatusEvent {
   type: StatusType;
@@ -30,6 +30,8 @@ export function detectStatusEvents(previous: EventSum, next: EventSum, at: numbe
     if (!before) continue;
     if (repo.reviewRequested > before.reviewRequested) events.push({ type: "review-requested", at });
     if (repo.PRs > before.PRs) events.push({ type: "new-pr", at });
+    // The count restarts every day, so only a rise means a merge.
+    if (repo.todaysMergedPRs > before.todaysMergedPRs) events.push({ type: "merged", at });
   }
   // Matching a different column changes the count without anyone adding a task.
   const before = column(previous, "TO_DO");
