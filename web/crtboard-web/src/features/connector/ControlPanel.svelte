@@ -1,7 +1,8 @@
 <!--
   @component
   Figma `Control Panel`: the connector settings once `crtboardd` answers
-  (Connection=True), otherwise a prompt to start it and try again.
+  (Connection=True), otherwise a prompt to start it and retry, optionally on
+  another port.
 -->
 <script lang="ts">
   import Button from "../../lib/ui/Button.svelte";
@@ -11,6 +12,16 @@
   import BoardSelector from "./BoardSelector.svelte";
   import { connector } from "./connector.svelte";
   import RepositorySelected from "./RepositorySelected.svelte";
+
+  let port = $state(String(connector.settings.value.port));
+  const portValid = $derived(/^\d+$/.test(port.trim()) && Number(port) > 0 && Number(port) < 65536);
+
+  function reconnect(event: SubmitEvent) {
+    event.preventDefault();
+    if (!portValid) return;
+    connector.settings.value.port = Number(port);
+    connector.connect();
+  }
 </script>
 
 <section class="control-panel" aria-labelledby="control-panel-title">
@@ -40,13 +51,23 @@
         however this dashboard is unable to find your server, please make sure<br />
         it is running correctly.
       </p>
-      <Button
-        pressed={connector.status === "connecting"}
-        disabled={connector.status === "connecting"}
-        onclick={() => connector.connect()}
-      >
-        Try Again
-      </Button>
+      <form class="retry" onsubmit={reconnect}>
+        <Input
+          bind:value={port}
+          width={67}
+          placeholder="Port"
+          inputmode="numeric"
+          aria-label="crtboardd port"
+          aria-invalid={!portValid}
+        />
+        <Button
+          type="submit"
+          pressed={connector.status === "connecting"}
+          disabled={connector.status === "connecting"}
+        >
+          Try Again
+        </Button>
+      </form>
     </div>
   {/if}
 </section>
@@ -102,6 +123,13 @@
     justify-content: center;
     width: 100%;
     overflow: hidden;
+  }
+
+  .retry {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+    align-items: center;
   }
 
   .disconnected p {

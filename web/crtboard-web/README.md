@@ -15,8 +15,9 @@ npm run dev      # the app, talking to localhost:7777
 `npm run check` type-checks, `npm test` runs the unit tests and
 `npm run build` writes the static bundle to `dist/`.
 
-The daemon port defaults to 7777; open the app with `?port=<port>` to use
-another one (it is remembered). `curl -X POST localhost:7777/mock/mutate`
+The daemon port defaults to 7777. While the app cannot reach `crtboardd`,
+the control panel has a Port field next to Try Again; `?port=<port>` in the
+URL works too. The port is remembered. `curl -X POST localhost:7777/mock/mutate`
 makes the mock change something right away, to watch the dashboard flash.
 
 ## How it works
