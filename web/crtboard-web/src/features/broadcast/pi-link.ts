@@ -1,6 +1,13 @@
 /** The Pi's USB gadget IDs (gateway/usb-gadget/crtboard-gadget.sh). */
 const FILTERS: SerialPortFilter[] = [{ usbVendorId: 0x1d6b, usbProductId: 0x0104 }];
 const REPLY_TIMEOUT_MS = 10_000;
+/**
+ * A tab closed or reloaded mid-frame leaves crt-display reading that frame
+ * for up to 3 s, swallowing our PINGs; keep asking for this long.
+ */
+const HANDSHAKE_MS = 8000;
+const PING_INTERVAL_MS = 1000;
+const CLOSE_TIMEOUT_MS = 1000;
 
 /**
  * Serial connection to `crt-display` on the Raspberry Pi, speaking its line
@@ -30,8 +37,7 @@ export class PiLink {
     await port.open({ baudRate: 115200 });
     const link = new PiLink(port);
     try {
-      const reply = await link.#command("PING", 3000);
-      if (!reply.startsWith("PONG")) throw new Error(`unexpected reply: ${reply}`);
+      await link.#handshake();
     } catch (error) {
       await link.close();
       throw error;
@@ -58,8 +64,29 @@ export class PiLink {
     }
     if (ready !== "READY") throw new Error(ready);
     await this.#writer.write(data);
-    const result = await this.#nextLine(30_000);
+    const result = await this.#reply(30_000);
     if (!result.startsWith("OK")) throw new Error(result);
+  }
+
+  /**
+   * Pings until crt-display answers, discarding whatever is left over from an
+   * earlier session: replies to a closed tab, or the error for a frame it
+   * never finished.
+   */
+  async #handshake(): Promise<void> {
+    const deadline = Date.now() + HANDSHAKE_MS;
+    while (Date.now() < deadline) {
+      await this.#write(`PING`);
+      const roundEnd = Date.now() + PING_INTERVAL_MS;
+      try {
+        while (Date.now() < roundEnd) {
+          if ((await this.#nextLine(roundEnd - Date.now())).startsWith("PONG")) return;
+        }
+      } catch {
+        // No answer this round; ask again.
+      }
+    }
+    throw new Error("crt-display did not answer");
   }
 
   async close(): Promise<void> {
@@ -67,8 +94,11 @@ export class PiLink {
     this.#closed = true;
     try {
       this.#writer.releaseLock();
-      await this.#reader.cancel();
-      await this.#port.close();
+      // A wedged port must not leave the UI waiting on it.
+      await Promise.race([
+        this.#reader.cancel().then(() => this.#port.close()),
+        new Promise((resolve) => setTimeout(resolve, CLOSE_TIMEOUT_MS)),
+      ]);
     } catch (error) {
       console.warn("closing the serial port failed", error);
     }
@@ -76,8 +106,20 @@ export class PiLink {
   }
 
   async #command(line: string, timeoutMs = REPLY_TIMEOUT_MS): Promise<string> {
-    await this.#writer.write(new TextEncoder().encode(`${line}\n`));
-    return this.#nextLine(timeoutMs);
+    await this.#write(line);
+    return this.#reply(timeoutMs);
+  }
+
+  #write(line: string): Promise<void> {
+    return this.#writer.write(new TextEncoder().encode(`${line}\n`));
+  }
+
+  /** The next reply, skipping late PONGs from extra handshake PINGs. */
+  async #reply(timeoutMs: number): Promise<string> {
+    for (;;) {
+      const line = await this.#nextLine(timeoutMs);
+      if (!line.startsWith("PONG")) return line;
+    }
   }
 
   async #readLoop(): Promise<void> {
