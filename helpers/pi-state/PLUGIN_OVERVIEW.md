@@ -9,6 +9,10 @@ Watch a Raspberry Pi from the BB sidebar.
   connection drops.
 - A live connection indicator with uptime and a heartbeat every 2 seconds.
 - CPU and memory use while connected.
+- A USB icon that turns green when the Pi's USB-C OTG serial gadget is
+  attached to a computer and crt-display is listening, so images can be
+  uploaded with WebSerial. Hover it, or open the card, for the reason when
+  it is grey.
 - Restart and Shut down buttons (each asks for a second click). They run
   `sudo -n systemctl reboot` / `poweroff`, so the SSH user needs passwordless
   sudo.
@@ -19,5 +23,5 @@ Watch a Raspberry Pi from the BB sidebar.
 
 The BB server keeps one `ssh` session open to the Pi with your existing SSH
 keys (`BatchMode`, so it never prompts). Apart from the power buttons, the Pi only runs a read-only shell
-loop that prints `/proc/stat` and `/proc/meminfo`; nothing is installed there.
+loop that prints `/proc/stat`, `/proc/meminfo`, and the USB gadget state; nothing is installed there.
 Set the host, username, and port under Settings → Installed plugins → Pi State.

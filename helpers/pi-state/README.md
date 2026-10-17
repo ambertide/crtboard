@@ -5,7 +5,12 @@ A BB plugin that shows the state of a Raspberry Pi in a sidebar panel.
 - `server.ts` — a background service holds one `ssh` session to the Pi
   (`BatchMode`, `ServerAliveInterval=5`, `StrictHostKeyChecking=accept-new`).
   The remote side runs a small sh loop that prints the board model and
-  hostname once, then a `/proc/stat` and `/proc/meminfo` sample every 2 s.
+  hostname once, then a `/proc/stat` and `/proc/meminfo` sample every 2 s,
+  along with the USB OTG state: the device controller bound in
+  `/sys/kernel/config/usb_gadget`, its `/sys/class/udc/<udc>/state`, and
+  `systemctl is-active crt-display`. The panel shows WebSerial as ready only
+  when a gadget is bound, the state is `configured` (a computer enumerated
+  it), and crt-display is running.
   The session counts as alive while lines keep arriving; after 15 s of
   silence, or when ssh exits, it reconnects with exponential backoff
   (1 s doubling to 60 s, ±20% jitter, reset after a successful connection).

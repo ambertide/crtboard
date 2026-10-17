@@ -21,6 +21,16 @@ export const statsSchema = z.object({
   at: z.string(),
 });
 
+/** The USB-C OTG serial gadget that crt-display receives uploads on. */
+export const usbSchema = z.object({
+  /** A USB gadget is bound to the Pi's device controller. */
+  gadget: z.boolean(),
+  /** The controller's state, e.g. "configured" once a computer enumerated it. */
+  link: z.string().max(40),
+  /** The crt-display service, which listens on /dev/ttyGS0, is running. */
+  listener: z.boolean(),
+});
+
 export const connectionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("connecting"), attempt: z.number().int() }),
   z.object({
@@ -47,12 +57,15 @@ export const piStateSchema = z.object({
   device: deviceSchema.nullable(),
   /** Latest sample; null unless connected. */
   stats: statsSchema.nullable(),
+  /** Latest OTG serial sample; null unless connected. */
+  usb: usbSchema.nullable(),
   /** A restart or shutdown sent from the panel; cleared on the next connect. */
   power: z.object({ action: powerActionSchema, at: z.string() }).nullable(),
 });
 
 export type PiDevice = z.infer<typeof deviceSchema>;
 export type PiStats = z.infer<typeof statsSchema>;
+export type PiUsb = z.infer<typeof usbSchema>;
 export type PiConnection = z.infer<typeof connectionSchema>;
 export type PiState = z.infer<typeof piStateSchema>;
 export type PowerAction = z.infer<typeof powerActionSchema>;

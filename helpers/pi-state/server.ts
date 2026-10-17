@@ -2,12 +2,17 @@
 //
 // A background service keeps one `ssh` session open to the Raspberry Pi. The
 // remote side runs a small sh loop that prints the board model once, then a
-// CPU and memory sample every 2 s:
+// CPU, memory and USB OTG sample every 2 s:
 //
 //   model Raspberry Pi 4 Model B Rev 1.4
 //   host crtpi
 //   stat cpu  1234 0 567 89012 ...      (every 2 s)
 //   mem 3884396 3120044                  (every 2 s)
+//   usb fe980000.usb configured active   (every 2 s)
+//
+// The usb line is the device controller bound to a USB gadget ("-" if none),
+// its state ("configured" once a computer has enumerated it), and whether the
+// crt-display service that serves the serial port is active.
 //
 // The connection counts as alive while those lines keep arriving. When ssh
 // exits, or no line arrives for STALE_MS, the service reconnects with
@@ -49,6 +54,9 @@ echo "host $(hostname)"
 while :; do
   echo "stat $(head -n 1 /proc/stat)"
   echo "mem $(awk '/^MemTotal:/{t=$2} /^MemAvailable:/{a=$2} END{print t, a}' /proc/meminfo)"
+  udc=$(cat /sys/kernel/config/usb_gadget/*/UDC 2>/dev/null | grep -m 1 .)
+  link=$([ -n "$udc" ] && cat "/sys/class/udc/$udc/state" 2>/dev/null)
+  echo "usb \${udc:--} $(echo \${link:--} | tr ' ' '-') $(systemctl is-active crt-display 2>/dev/null)"
   sleep 2
 done
 `;
@@ -171,6 +179,7 @@ export default async function plugin(bb: BbPluginApi) {
     connection: { kind: "connecting", attempt: 0 },
     device: null,
     stats: null,
+    usb: null,
     power: null,
   };
 
@@ -299,6 +308,18 @@ export default async function plugin(bb: BbPluginApi) {
             previousCpu = sample;
             break;
           }
+          case "usb": {
+            const [udc, link, listener] = rest.trim().split(/\s+/);
+            if (!connected || udc === undefined || link === undefined) break;
+            update({
+              usb: {
+                gadget: udc !== "-",
+                link: link === "-" ? "unbound" : link.slice(0, 40),
+                listener: listener === "active",
+              },
+            });
+            break;
+          }
           case "mem": {
             const [memTotalKb, memAvailableKb] = rest.trim().split(/\s+/).map(Number);
             if (!connected || !Number.isFinite(memTotalKb) || !Number.isFinite(memAvailableKb)) {
@@ -351,6 +372,7 @@ export default async function plugin(bb: BbPluginApi) {
             target: "",
             device: null,
             stats: null,
+            usb: null,
             connection: {
               kind: "disconnected",
               error: `Invalid settings: ${error instanceof Error ? error.message : String(error)}`,
@@ -369,6 +391,7 @@ export default async function plugin(bb: BbPluginApi) {
           target: label,
           device,
           stats: null,
+          usb: null,
           connection: { kind: "connecting", attempt },
         });
 
@@ -390,6 +413,7 @@ export default async function plugin(bb: BbPluginApi) {
         );
         update({
           stats: null,
+          usb: null,
           connection: {
             kind: "disconnected",
             error: result.error.slice(0, 2000),
