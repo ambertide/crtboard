@@ -175,6 +175,12 @@ asana board and your tracked git repos, which can only be two, in
 the localstorage, during initial connection it tries to find them in
 the `available*` resource blocks.
 
+In addition, `crtboard-web` also owns and manages repeating events,
+which are events with names such as Daily Meeting and a cron
+expression, for instance `30 10 * * *`, `crtboard-web` tracks if the
+current time is ~10m away from this event and then shows a tracker
+in the dashboard with the event name in all caps
+
 ## `crt-display`
 
 The gateway go service is a `systemd` service which allows for the

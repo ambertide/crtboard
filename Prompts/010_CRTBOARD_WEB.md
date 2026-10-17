@@ -36,4 +36,17 @@
 * In Connector There is an Upload button, when this button is Pressed,
   user is shown a image picker, the image they have chosen is then
   shown in the CRT television until they press stop
+* Before the Image is shown flash Phillips Test Image for a few seconds
+  and likewise after we cancel, before going to dashboard
 * User will be shown the WebSerial picker after they select broadcast
+* This is not in the figma file but when the Status, Substatus PR
+  counts, branch names, or task counts change the that portion of the
+  screen should flash between gray-400 and gray-50 before settling
+  on whatever is the correct font color for it.
+  * t- countdown does not flash as that would be too distracting
+  neither does the clock, when an item flashes it should lfash with its
+  symbol if there is a symbol, the flashes should be 1s gray-50 1s
+  gray-400
+* Repeating events should flash until they arive, afterwards they stay
+  on the screen for 10 more minutes without flashing at gray-50,
+* Review Requested > PR Opened in terms of status importance
