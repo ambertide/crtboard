@@ -1,7 +1,7 @@
 <!--
   @component
   Figma `Repeated Events`: the list of repeating events (Filled) or a hint on
-  how to add one (Empty).
+  how to add one (Empty). The list scrolls within itself.
 -->
 <script lang="ts">
   import Button from "../../lib/ui/Button.svelte";
@@ -43,10 +43,13 @@
     color: var(--gray-50);
   }
 
+  /* Two rows tall, as in the Filled variant; more rows scroll here instead of growing the panel. */
   .rows {
     display: flex;
     flex-direction: column;
     gap: 2px;
     align-items: flex-start;
+    max-height: 64px;
+    overflow-y: auto;
   }
 </style>

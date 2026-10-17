@@ -1,7 +1,7 @@
 <!--
   @component
   Figma `Git Status`: one tracked repository's review requests, name and
-  current branch.
+  current branch, with the name centred on the row.
 -->
 <script lang="ts">
   import CurrentBranch from "./CurrentBranch.svelte";
@@ -19,12 +19,13 @@
 </div>
 
 <style>
+  /* Equal side columns keep the project name centred on the row. */
   .git-status {
-    display: flex;
+    display: grid;
     flex: 1 0 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) minmax(0, 1fr);
     gap: 8px;
     align-items: center;
-    justify-content: space-between;
     min-width: 0;
     padding: 7px 0;
     overflow: hidden;

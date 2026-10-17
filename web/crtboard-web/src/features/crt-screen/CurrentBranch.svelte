@@ -18,11 +18,11 @@
 <style>
   .current-branch {
     display: flex;
-    flex-shrink: 1;
     gap: 8px;
     align-items: center;
+    justify-self: end;
     min-width: 0;
-    max-width: 50%;
+    max-width: 100%;
     color: var(--gray-50);
   }
 

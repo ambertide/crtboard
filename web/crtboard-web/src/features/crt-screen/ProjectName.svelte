@@ -10,8 +10,8 @@
 
 <style>
   .project-name {
-    flex: 1 0 0;
     min-width: 0;
+    max-width: 240px;
     height: 24px;
     overflow: hidden;
     color: var(--gray-50);

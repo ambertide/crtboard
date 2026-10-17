@@ -54,8 +54,9 @@ makes the mock change something right away, to watch the dashboard flash.
 - When a status, the deployment advice, a review-request count, a branch or a
   task count changes, it flashes gray-50/gray-400, a second each, for six
   seconds. The clock and the countdown never flash.
-- The deployment advice under Nominal is Deployment Ready Monday to Thursday,
-  Avoid Deployment on Fridays and Do Not Deploy at weekends.
+- The deployment advice under Nominal follows [Prompts/011_Deploys.md](../../Prompts/011_Deploys.md):
+  Ready Monday to Thursday 06:00–16:30; Avoid 04:00–06:00 and 16:30–20:30 on
+  those days and Friday 04:00–12:00; Do Not Deploy otherwise.
 - `crtboardd` must answer from `http://localhost:<port>` with CORS headers.
   For the GitHub Pages copy, Chrome also sends a Private Network Access
   preflight, which needs `Access-Control-Allow-Private-Network: true` (the

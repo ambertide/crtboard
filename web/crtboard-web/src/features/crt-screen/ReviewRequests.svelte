@@ -16,18 +16,25 @@
 
 <p class="review-requests body-small" class:existing={count > 0} style:color={flash ? FLASH_COLORS[flash] : undefined}>
   <Icon name="git-merge" />
-  <span>{text}</span>
+  <span class="text">{text}</span>
 </p>
 
 <style>
   .review-requests {
     display: flex;
-    flex-shrink: 0;
     gap: 8px;
     align-items: center;
-    overflow: hidden;
+    justify-self: start;
+    min-width: 0;
+    max-width: 100%;
     color: var(--gray-400);
     white-space: nowrap;
+  }
+
+  .text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .existing {
