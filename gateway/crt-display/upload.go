@@ -6,6 +6,8 @@ package main
 //	PING            -> PONG crt-display
 //	IMG <bytes>     -> READY, then the host sends exactly <bytes> bytes of a
 //	                   PNG, JPEG or GIF file -> OK <width>x<height>
+//	FRAME <bytes>   -> same as IMG, but the image is a frame of a live stream
+//	                   and is not saved to disk
 //
 // Any failure is answered with ERR <reason>.
 
@@ -78,9 +80,9 @@ func serveSerial(path, dir string, uploads chan<- upload) error {
 			continue
 		case "PING":
 			err = reply("PONG crt-display")
-		case "IMG":
+		case "IMG", "FRAME":
 			var u upload
-			if u, err = receiveImage(port, r, arg, dir, reply); err != nil {
+			if u, err = receiveImage(port, r, arg, dir, cmd == "IMG", reply); err != nil {
 				err = reply("ERR %v", err)
 			} else {
 				uploads <- u
@@ -95,7 +97,9 @@ func serveSerial(path, dir string, uploads chan<- upload) error {
 	}
 }
 
-func receiveImage(port *os.File, r *bufio.Reader, arg, dir string, reply func(string, ...any) error) (upload, error) {
+// receiveImage reads one image body. Uploads are kept in dir; stream frames
+// (keep false) arrive many times a second and are only held in memory.
+func receiveImage(port *os.File, r *bufio.Reader, arg, dir string, keep bool, reply func(string, ...any) error) (upload, error) {
 	size, err := strconv.Atoi(arg)
 	if err != nil || size <= 0 {
 		return upload{}, fmt.Errorf("bad size %q", arg)
@@ -130,6 +134,9 @@ func receiveImage(port *os.File, r *bufio.Reader, arg, dir string, reply func(st
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return upload{}, fmt.Errorf("decode: %v", err)
+	}
+	if !keep {
+		return upload{image: toGray(img), path: "the serial stream"}, nil
 	}
 
 	// Keep only the latest upload; dir is under /tmp so it goes on reboot.
