@@ -1,0 +1,92 @@
+/* Design tokens from the Figma file; `.tokens` re-declares them for the CRT
+   snapshot, which is rendered outside this document. */
+:root,
+.tokens {
+  --gray-50: #f9fafb;
+  --gray-300: #d1d5dc;
+  --gray-400: #99a1af;
+  --gray-500: #6a7282;
+  --gray-700: #364153;
+  --gray-800: #1e2939;
+  --gray-900: #101828;
+  --gray-950: #030712;
+  --white: #ffffff;
+  --font-body: "Handjet", sans-serif;
+  --font-header: "VT323", monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--gray-300);
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+.body-small,
+.body-large {
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: normal;
+  font-variation-settings: "ELGR" 1, "ELSH" 2;
+}
+
+.body-small {
+  font-size: 20px;
+}
+
+.body-large {
+  font-size: 28px;
+}
+
+.header-xs,
+.header-m,
+.header-l,
+.header-xl {
+  font-family: var(--font-header);
+  font-weight: 400;
+  line-height: normal;
+}
+
+.header-xs {
+  font-size: 24px;
+}
+
+.header-m {
+  font-size: 32px;
+}
+
+.header-l {
+  font-size: 48px;
+}
+
+.header-xl {
+  font-size: 64px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

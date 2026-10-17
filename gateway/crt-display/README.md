@@ -44,6 +44,10 @@ The protocol is line based, with one reply line per command:
 | --- | --- |
 | `PING` | `PONG crt-display` |
 | `IMG <bytes>` | `READY`; then send exactly `<bytes>` bytes of a PNG, JPEG or GIF and get `OK <width>x<height>` |
+| `FRAME <bytes>` | Same as `IMG`, for one frame of a live stream: the image is shown but not saved to disk |
+
+[`crtboard-web`](../../web/crtboard-web/README.md) streams its dashboard with
+`FRAME` at 25 frames per second, waiting for each `OK` before sending the next.
 
 Failures are answered with `ERR <reason>`. Uploads are limited to 16 MiB and
 the body must arrive within 30 seconds.

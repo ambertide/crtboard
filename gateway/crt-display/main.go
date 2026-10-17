@@ -134,6 +134,30 @@ func loadGray(path string) (*image.Gray, error) {
 func toGray(src image.Image) *image.Gray {
 	b := src.Bounds()
 	gray := image.NewGray(image.Rect(0, 0, b.Dx(), b.Dy()))
+
+	// Browser canvases encode to RGBA PNGs; reading their pixels directly is
+	// fast enough for a live stream, unlike the generic At() path below.
+	var pix []byte
+	var stride int
+	switch img := src.(type) {
+	case *image.NRGBA:
+		pix, stride = img.Pix[img.PixOffset(b.Min.X, b.Min.Y):], img.Stride
+	case *image.RGBA:
+		pix, stride = img.Pix[img.PixOffset(b.Min.X, b.Min.Y):], img.Stride
+	}
+	if pix != nil {
+		for y := 0; y < b.Dy(); y++ {
+			row := pix[y*stride:]
+			out := gray.Pix[y*gray.Stride:]
+			for x := 0; x < b.Dx(); x++ {
+				// Widen to 16 bits as RGBA() does, so both paths round alike.
+				r, g, bl := uint32(row[x*4])*0x101, uint32(row[x*4+1])*0x101, uint32(row[x*4+2])*0x101
+				out[x] = uint8((299*r + 587*g + 114*bl) / 1000 >> 8)
+			}
+		}
+		return gray
+	}
+
 	for y := 0; y < b.Dy(); y++ {
 		for x := 0; x < b.Dx(); x++ {
 			r, g, bl, _ := src.At(b.Min.X+x, b.Min.Y+y).RGBA()
