@@ -7,8 +7,9 @@
 //
 // The card reads the server's state once with get_state, then follows the
 // "pi-state" realtime channel. The board picture stays after the connection
-// drops; CPU and memory show only while connected. Restart and Shut down ask
-// for a second click before the server runs them on the Pi.
+// drops; CPU, memory and the USB OTG indicator show only while connected.
+// Restart and Shut down ask for a second click before the server runs them on
+// the Pi.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { definePluginApp, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./server";
@@ -17,6 +18,7 @@ import {
   piStateSchema,
   type PiState,
   type PiStats,
+  type PiUsb,
   type PowerAction,
 } from "./state";
 import { BoardPicture } from "./board";
@@ -136,6 +138,48 @@ function Stats({ stats }: { stats: PiStats }) {
         percent={memPercent}
       />
     </div>
+  );
+}
+
+/** Whether a browser can reach crt-display over the USB-C serial gadget. */
+function usbStatus(usb: PiUsb) {
+  if (!usb.gadget) return { ready: false, text: "USB OTG off" };
+  if (usb.link !== "configured") {
+    return { ready: false, text: `USB OTG on, no computer attached (${usb.link})` };
+  }
+  if (!usb.listener) return { ready: false, text: "USB OTG attached, crt-display not running" };
+  return { ready: true, text: "USB OTG ready for WebSerial" };
+}
+
+/**
+ * The Material Symbols "usb" glyph, drawn in currentColor. Copyright Google
+ * LLC, Apache-2.0; see THIRD_PARTY_NOTICES.md.
+ */
+function UsbGlyph({ className, label }: { className?: string; label?: string }) {
+  return (
+    <svg
+      viewBox="0 -960 960 960"
+      fill="currentColor"
+      className={className}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+    >
+      <path d="M423.5-103.5Q400-127 400-160q0-21 11-39t29-29v-92H320q-33 0-56.5-23.5T240-400v-92q-18-9-29-27t-11-41q0-33 23.5-56.5T280-640q33 0 56.5 23.5T360-560q0 23-11 40t-29 28v92h120v-320h-80l120-160 120 160h-80v320h120v-80h-40v-160h160v160h-40v80q0 33-23.5 56.5T640-320H520v92q19 10 29.5 28t10.5 40q0 33-23.5 56.5T480-80q-33 0-56.5-23.5Z" />
+    </svg>
+  );
+}
+
+function UsbIndicator({ usb, withText = false }: { usb: PiUsb; withText?: boolean }) {
+  const { ready, text } = usbStatus(usb);
+  return (
+    <span className="flex min-w-0 items-center gap-1.5" title={text}>
+      <UsbGlyph
+        label={withText ? undefined : text}
+        className={cn("size-3.5 shrink-0", ready ? "text-emerald-500" : "text-muted-foreground opacity-60")}
+      />
+      {withText ? <span className="truncate text-muted-foreground">{text}</span> : null}
+    </span>
   );
 }
 
@@ -261,6 +305,7 @@ function PiCard() {
           ? { tone: "pending", text: connection.attempt > 0 ? `Reconnecting (attempt ${connection.attempt + 1})…` : "Connecting…" }
           : { tone: "down", text: "Disconnected" };
 
+  const usb = connection?.kind === "connected" ? (state?.usb ?? null) : null;
   const expanded = useSyncExternalStore(expandedStore.subscribe, expandedStore.get);
   const dot = (
     <span
@@ -289,6 +334,7 @@ function PiCard() {
       >
         {dot}
         <span className="max-w-32 truncate font-medium">{device?.hostname || "Pi"}</span>
+        {usb ? <UsbIndicator usb={usb} /> : null}
         <span className="text-muted-foreground">
           {cpu != null ? `CPU ${cpu.toFixed(0)}%` : status.tone === "live" ? "Live" : status.text}
         </span>
@@ -311,6 +357,7 @@ function PiCard() {
       >
         {dot}
         <span className="font-medium">Raspberry Pi</span>
+        {usb ? <UsbIndicator usb={usb} /> : null}
         <span className="min-w-0 flex-1 truncate text-right text-muted-foreground" role="status">
           {status.text}
         </span>
@@ -355,6 +402,7 @@ function PiCard() {
               <Icon name="Activity" className="size-3.5" />
               <span>Heartbeat {formatDuration(now - Date.parse(connection.lastSeen))} ago</span>
             </div>
+            {usb ? <UsbIndicator usb={usb} withText /> : null}
             <PowerControls hostname={device?.hostname || "the Pi"} />
           </>
         ) : null}
