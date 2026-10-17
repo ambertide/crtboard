@@ -32,6 +32,9 @@ const (
 	maxUploadBytes  = 16 << 20
 	maxUploadPixels = 40_000_000
 	bodyTimeout     = 30 * time.Second
+	// A stream frame arrives in milliseconds; one cut off by a closed or
+	// reloaded browser tab must not hold up the next connection for long.
+	frameTimeout = 3 * time.Second
 )
 
 type upload struct {
@@ -113,7 +116,11 @@ func receiveImage(port *os.File, r *bufio.Reader, arg, dir string, keep bool, re
 
 	// A host that stops mid-transfer must not leave the reader waiting forever.
 	// Deadlines are best effort; the port may not support them.
-	port.SetReadDeadline(time.Now().Add(bodyTimeout))
+	timeout := bodyTimeout
+	if !keep {
+		timeout = frameTimeout
+	}
+	port.SetReadDeadline(time.Now().Add(timeout))
 	data := make([]byte, size)
 	_, err = io.ReadFull(r, data)
 	port.SetReadDeadline(time.Time{})
