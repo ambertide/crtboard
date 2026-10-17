@@ -26,6 +26,11 @@ A BB plugin that shows the state of a Raspberry Pi in a sidebar panel.
 - `board.tsx` — SVG drawings of the board families (Pi 5, 4, 3, 3 A+,
   Zero, 400/500, Compute Module), picked from the reported model string.
 
+## Third-party assets
+
+The USB icon is from Google's Material Symbols (Apache-2.0); see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ## Settings
 
 | Key        | Default         |

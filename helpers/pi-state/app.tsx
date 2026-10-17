@@ -151,7 +151,10 @@ function usbStatus(usb: PiUsb) {
   return { ready: true, text: "USB OTG ready for WebSerial" };
 }
 
-/** The Material Symbols "usb" glyph (Apache-2.0), drawn in currentColor. */
+/**
+ * The Material Symbols "usb" glyph, drawn in currentColor. Copyright Google
+ * LLC, Apache-2.0; see THIRD_PARTY_NOTICES.md.
+ */
 function UsbGlyph({ className, label }: { className?: string; label?: string }) {
   return (
     <svg
