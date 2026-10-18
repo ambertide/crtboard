@@ -20,6 +20,13 @@ class Section:
 
 
 @dataclass(frozen=True)
+class SectionCounts:
+    open: int
+    completed: int
+    created: int
+
+
+@dataclass(frozen=True)
 class Board:
     gid: str
     name: str
@@ -87,20 +94,26 @@ class Asana:
                 return changed, body["sync"]
             params = {**params, "sync": body["sync"]}
 
-    async def open_tasks(self, section_gid: str) -> int:
-        tasks = await self._pages(f"/sections/{section_gid}/tasks", {"opt_fields": "completed"})
-        return sum(not task.get("completed") for task in tasks)
+    async def section_counts(self, section_gid: str, since: datetime) -> SectionCounts:
+        """Counts for the tasks now in the section; `since` is local midnight, timezone-aware.
 
-    async def completed_since(self, section_gid: str, since: datetime) -> int:
-        """Tasks in the section marked complete at or after `since` (timezone-aware)."""
+        Asana only returns tasks that are open or were completed since `since`,
+        so older finished tasks are never fetched.
+        """
         tasks = await self._pages(
             f"/sections/{section_gid}/tasks",
-            {"opt_fields": "completed,completed_at", "completed_since": since.isoformat()},
+            {"opt_fields": "completed,completed_at,created_at", "completed_since": since.isoformat()},
         )
-        return sum(
-            1
-            for task in tasks
-            if task.get("completed") and task.get("completed_at") and _parse(task["completed_at"]) >= since
+
+        def at_or_after(field: str, task: dict) -> bool:
+            return bool(task.get(field)) and _parse(task[field]) >= since
+
+        return SectionCounts(
+            open=sum(not task.get("completed") for task in tasks),
+            completed=sum(
+                bool(task.get("completed")) and at_or_after("completed_at", task) for task in tasks
+            ),
+            created=sum(at_or_after("created_at", task) for task in tasks),
         )
 
 

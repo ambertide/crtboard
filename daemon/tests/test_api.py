@@ -75,7 +75,7 @@ def test_tracking_flows_into_the_event_sum(client):
         "gitRepos": {
             "beemu": {"PRs": 2, "todaysMergedPRs": 0, "branch": "feat/tokenizer/add-ld", "reviewRequested": 1}
         },
-        "asanaBoards": {"todo": {"matchedColumnName": "Will Do", "tasks": 7}},
+        "asanaBoards": {"todo": {"matchedColumnName": "Will Do", "tasks": 7, "todaysCreatedTasks": 0}},
     }
 
     assert client.put(f"/resources/git/tracked/{repo_id}", json={"name": "local-only"}).json() == {

@@ -43,6 +43,8 @@ export interface RepoSummary {
 export interface ColumnSummary {
   matchedColumnName: string;
   tasks: number;
+  /** Tasks created today that are now in this column. */
+  todaysCreatedTasks: number;
 }
 
 /** Payload of the `CRTBOARD_EVENT_SUM` server-sent event. */

@@ -1,6 +1,6 @@
 <!--
   @component
-  Figma `Git Status`: one tracked repository's review requests, name and
+  Figma `Git Status`: one tracked repository's open PRs, name and
   current branch, with the name centred on the row.
 -->
 <script lang="ts">
@@ -13,7 +13,7 @@
 </script>
 
 <div class="git-status">
-  <ReviewRequests count={repo.reviewRequested} flash={repo.reviewFlash} />
+  <ReviewRequests count={repo.openPRs} flash={repo.openPRsFlash} />
   <ProjectName name={repo.name} />
   <CurrentBranch branch={repo.branch} flash={repo.branchFlash} />
 </div>

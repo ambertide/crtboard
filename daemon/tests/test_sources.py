@@ -53,14 +53,14 @@ def test_no_slug_without_a_github_remote(repos):
 
 
 def test_pull_request_counts_combine_the_searches():
-    gh = FakeGh({"open": 3, "merged": 31, "reviewOpen": 2, "reviewMerged": 3, "today": 1})
+    gh = FakeGh({"open": 3, "reviewOpen": 2, "reviewMerged": 3, "today": 1})
     counts = GitHub(["octocat", "hubot"], runner=gh).counts("octo/beemu", DAY_START)
-    assert (counts.prs, counts.review_requested, counts.todays_merged) == (34, 5, 1)
+    assert (counts.prs, counts.review_requested, counts.todays_merged) == (3, 5, 1)
 
     fields = gh.calls[0]
     involved = "(author:octocat OR review-requested:octocat OR author:hubot OR review-requested:hubot)"
     assert fields["open"] == f"repo:octo/beemu is:pr is:open {involved}"
-    assert fields["merged"] == f"repo:octo/beemu is:pr is:merged {involved}"
+    assert "merged" not in fields, "merged PRs are not waiting for anything"
     assert (
         fields["reviewOpen"]
         == "repo:octo/beemu is:pr is:open (review-requested:octocat OR review-requested:hubot)"
@@ -84,19 +84,24 @@ def test_asana_lists_boards_with_their_columns(fake_asana):
     assert len(boards[1].sections) == 150  # paginated
 
 
-def test_asana_counts_open_tasks_and_tasks_done_today(fake_asana):
-    fake_asana.tasks["s1"] = [{"completed": False}] * 120 + [{"completed": True}]
+def test_asana_counts_open_done_today_and_created_today(fake_asana):
+    old, yesterday, today = "2026-01-01T09:00:00Z", "2026-10-17T20:59:59.000Z", "2026-10-17T21:00:00.000Z"
+    fake_asana.tasks["s1"] = [{"completed": False, "created_at": old}] * 120 + [
+        {"completed": False, "created_at": today},  # created at local midnight (UTC+3)
+        {"completed": False, "created_at": yesterday},  # 23:59 the day before
+    ]
     fake_asana.tasks["s3"] = [
-        {"completed": True, "completed_at": "2026-10-18T06:00:00.000Z"},
-        {"completed": True, "completed_at": "2026-10-17T20:59:59.000Z"},  # 23:59 the day before in UTC+3
-        {"completed": True, "completed_at": "2026-10-17T21:00:00.000Z"},  # local midnight
-        {"completed": False, "completed_at": None},
+        {"completed": True, "completed_at": "2026-10-18T06:00:00.000Z", "created_at": "2026-10-18T05:00:00Z"},
+        {"completed": True, "completed_at": yesterday, "created_at": old},
+        {"completed": True, "completed_at": today, "created_at": old},
+        {"completed": False, "completed_at": None, "created_at": old},
     ]
     asana = Asana("secret-token", transport=fake_asana.transport())
-    assert asyncio.run(asana.open_tasks("s1")) == 120
-    assert asyncio.run(asana.completed_since("s3", DAY_START)) == 2
-    done_request = fake_asana.requests[-1]
-    assert done_request.url.params["completed_since"] == "2026-10-18T00:00:00+03:00"
+    todo = asyncio.run(asana.section_counts("s1", DAY_START))
+    assert (todo.open, todo.created) == (122, 1)
+    done = asyncio.run(asana.section_counts("s3", DAY_START))
+    assert (done.completed, done.created) == (2, 1)
+    assert fake_asana.requests[-1].url.params["completed_since"] == "2026-10-18T00:00:00+03:00"
 
 
 def test_asana_events_report_changes_through_sync_tokens(fake_asana):

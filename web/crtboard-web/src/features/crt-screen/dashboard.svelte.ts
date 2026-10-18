@@ -23,8 +23,9 @@ export interface TaskCount {
 export interface RepoRow {
   name: string;
   branch: string;
-  reviewRequested: number;
-  reviewFlash: FlashPhase | null;
+  /** Open PRs opened by, or awaiting review from, the tracked users. */
+  openPRs: number;
+  openPRsFlash: FlashPhase | null;
   branchFlash: FlashPhase | null;
 }
 
@@ -75,8 +76,8 @@ class Dashboard {
         return {
           name,
           branch: summary?.branch ?? "",
-          reviewRequested: summary?.reviewRequested ?? 0,
-          reviewFlash: this.#flash(`review:${name}`),
+          openPRs: summary?.PRs ?? 0,
+          openPRsFlash: this.#flash(`prs:${name}`),
           branchFlash: this.#flash(`branch:${name}`),
         };
       }),
@@ -118,7 +119,7 @@ class Dashboard {
     };
     for (const kind of COLUMN_KINDS) values[`tasks:${kind}`] = columnTasks(connector.sum, kind);
     for (const [name, repo] of Object.entries(connector.sum.gitRepos)) {
-      values[`review:${name}`] = repo.reviewRequested;
+      values[`prs:${name}`] = repo.PRs;
       values[`branch:${name}`] = repo.branch;
     }
     return values;

@@ -7,8 +7,20 @@ import { STATUS_HOLD_MS, currentStatus, detectStatusEvents } from "../src/featur
 function sum(reviewRequested: number, PRs: number, todo: number, todoColumn = "Will Do", todaysMergedPRs = 0): EventSum {
   return {
     gitRepos: { beemu: { PRs, todaysMergedPRs, branch: "main", reviewRequested } },
-    asanaBoards: { todo: { matchedColumnName: todoColumn, tasks: todo } },
+    asanaBoards: { todo: { matchedColumnName: todoColumn, tasks: todo, todaysCreatedTasks: 0 } },
   };
+}
+
+type Column = [name: string, tasks: number, createdToday: number];
+
+function board(columns: Record<string, Column>): EventSum {
+  const asanaBoards = Object.fromEntries(
+    Object.entries(columns).map(([key, [name, tasks, created]]) => [
+      key,
+      { matchedColumnName: name, tasks, todaysCreatedTasks: created },
+    ]),
+  );
+  return { gitRepos: {}, asanaBoards };
 }
 
 test("a review request outranks a new pull request", () => {
@@ -28,9 +40,20 @@ test("a rise in today's merged PRs is a merge; the daily reset is not", () => {
   assert.equal(currentStatus(detectStatusEvents(sum(0, 1, 3, "Will Do", 4), sum(0, 1, 3, "Will Do", 0), 0), 1), "nominal");
 });
 
-test("only new tasks in the same column count as created", () => {
-  assert.equal(currentStatus(detectStatusEvents(sum(0, 1, 3), sum(0, 1, 4), 0), 1), "task-created");
-  assert.equal(currentStatus(detectStatusEvents(sum(0, 1, 3, "Backlog"), sum(0, 1, 9), 0), 1), "nominal");
+test("a task created in any column counts, even when no column count rises", () => {
+  // A task added to In progress while another moved from In progress to Done.
+  const before = board({ todo: ["To do", 3, 3], inProgress: ["In progress", 2, 2], done: ["Done", 0, 0] });
+  const moved = board({ todo: ["To do", 3, 3], inProgress: ["In progress", 1, 1], done: ["Done", 1, 1] });
+  assert.equal(currentStatus(detectStatusEvents(before, moved, 0), 1), "nominal", "moving a task is not creating one");
+  // Both at once: In progress is back to 2 tasks, so only the created count shows it.
+  const both = board({ todo: ["To do", 3, 3], inProgress: ["In progress", 2, 2], done: ["Done", 1, 1] });
+  assert.equal(currentStatus(detectStatusEvents(before, both, 0), 1), "task-created");
+});
+
+test("rematching a column or the daily reset is not a created task", () => {
+  const before = board({ todo: ["To do", 3, 0] });
+  assert.equal(currentStatus(detectStatusEvents(before, board({ todo: ["Backlog", 9, 4] }), 0), 1), "nominal");
+  assert.equal(currentStatus(detectStatusEvents(board({ todo: ["To do", 3, 5] }), before, 0), 1), "nominal");
 });
 
 test("a changed value flashes bright then dim each second, then settles", () => {

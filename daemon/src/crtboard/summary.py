@@ -55,7 +55,7 @@ class Poller:
         self._branches: dict[str, str] = {}
         self._prs: dict[str, PullRequestCounts] = {}
         self._boards: list[Board] = []
-        self._tasks: dict[str, int] = {}
+        self._tasks: dict[str, tuple[int, int]] = {}
         self._counted_board: tuple[str, str] | None = None
         self._sync: str | None = None
         self._recounted_at = 0.0
@@ -101,7 +101,12 @@ class Poller:
         if board:
             for kind, column in board.columns.items():
                 if column and kind in COLUMN_KEYS and kind in self._tasks:
-                    columns[COLUMN_KEYS[kind]] = {"matchedColumnName": column, "tasks": self._tasks[kind]}
+                    tasks, created = self._tasks[kind]
+                    columns[COLUMN_KEYS[kind]] = {
+                        "matchedColumnName": column,
+                        "tasks": tasks,
+                        "todaysCreatedTasks": created,
+                    }
         return {"gitRepos": repos, "asanaBoards": columns}
 
     async def run(self) -> None:
@@ -205,7 +210,8 @@ class Poller:
         except Exception as error:
             self._report("asana tasks", error)
 
-    async def _count(self, board: Board, columns: dict[str, str | None]) -> dict[str, int]:
+    async def _count(self, board: Board, columns: dict[str, str | None]) -> dict[str, tuple[int, int]]:
+        """`(tasks, created today)` per matched column."""
         sections = {s.name: s.gid for s in board.sections}
         day_start = self.now().replace(hour=0, minute=0, second=0, microsecond=0)
         counts = {}
@@ -213,9 +219,8 @@ class Poller:
             gid = sections.get(column) if column else None
             if not gid:
                 continue
+            section = await self.asana.section_counts(gid, day_start)
             # DONE only grows, so System.md counts the tasks finished today.
-            if kind == "DONE":
-                counts[kind] = await self.asana.completed_since(gid, day_start)
-            else:
-                counts[kind] = await self.asana.open_tasks(gid)
+            tasks = section.completed if kind == "DONE" else section.open
+            counts[kind] = (tasks, section.created)
         return counts

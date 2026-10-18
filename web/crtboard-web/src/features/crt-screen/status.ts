@@ -33,12 +33,18 @@ export function detectStatusEvents(previous: EventSum, next: EventSum, at: numbe
     // The count restarts every day, so only a rise means a merge.
     if (repo.todaysMergedPRs > before.todaysMergedPRs) events.push({ type: "merged", at });
   }
-  // Matching a different column changes the count without anyone adding a task.
-  const before = column(previous, "TO_DO");
-  const after = column(next, "TO_DO");
-  if (before && after && before.matchedColumnName === after.matchedColumnName && after.tasks > before.tasks) {
-    events.push({ type: "task-created", at });
+  // A new task can land in any column, and moves between columns can hide it
+  // from the column counts, so compare tasks created today instead. Columns
+  // matched differently in the two sums are left out: rematching is not news.
+  let createdBefore = 0;
+  let createdAfter = 0;
+  for (const [key, after] of Object.entries(next.asanaBoards)) {
+    const before = previous.asanaBoards[key];
+    if (!before || before.matchedColumnName !== after.matchedColumnName) continue;
+    createdBefore += before.todaysCreatedTasks ?? 0;
+    createdAfter += after.todaysCreatedTasks ?? 0;
   }
+  if (createdAfter > createdBefore) events.push({ type: "task-created", at });
   return events;
 }
 

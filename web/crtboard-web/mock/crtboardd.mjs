@@ -4,7 +4,8 @@
 // docs/System.md, with data that changes every so often.
 //
 // Usage: node mock/crtboardd.mjs [port]   (default 7777)
-//        curl -X POST localhost:7777/mock/mutate   forces a change now
+//        curl -X POST localhost:7777/mock/mutate                     forces a random change now
+//        curl -X POST 'localhost:7777/mock/mutate?change=task-created' forces that change
 import { createServer } from "node:http";
 
 const port = Number(process.argv[2] ?? 7777);
@@ -32,6 +33,7 @@ const repos = {
   crtboard: { PRs: 2, todaysMergedPRs: 0, branch: "main", reviewRequested: 1 },
 };
 const columnTasks = { TO_DO: 7, BLOCKED: 0, IN_PROGRESS: 0, DONE: 5 };
+const createdToday = { TO_DO: 2, BLOCKED: 0, IN_PROGRESS: 0, DONE: 1 };
 const BRANCHES = [
   "main",
   "feat/crt/flash-changes",
@@ -40,22 +42,35 @@ const BRANCHES = [
   "feature/tokenizer/add-support-for-very-long-load-instructions-in-the-assembler",
 ];
 
-/** One random change, so the dashboard has something to flash about. */
-function mutate() {
+/** Changes the mock can make; `POST /mock/mutate?change=<name>` picks one. */
+const CHANGES = {
+  "review-requested": (repo) => (repo.reviewRequested += 1),
+  "review-done": (repo) => (repo.reviewRequested = Math.max(0, repo.reviewRequested - 1)),
+  "pr-opened": (repo) => (repo.PRs += 1),
+  "pr-closed": (repo) => (repo.PRs = Math.max(0, repo.PRs - 1)),
+  merged: (repo) => {
+    repo.PRs = Math.max(0, repo.PRs - 1);
+    repo.todaysMergedPRs += 1;
+  },
+  branch: (repo) => (repo.branch = BRANCHES[Math.floor(Math.random() * BRANCHES.length)]),
+  "task-created": () => {
+    columnTasks.TO_DO += 1;
+    createdToday.TO_DO += 1;
+  },
+  "task-moved": () => {
+    const columns = Object.keys(columnTasks);
+    const column = columns[Math.floor(Math.random() * columns.length)];
+    columnTasks[column] = Math.max(0, columnTasks[column] + (Math.random() < 0.5 ? -1 : 1));
+  },
+};
+
+/** One change, random unless named, so the dashboard has something to flash about. */
+function mutate(name) {
   const names = Object.keys(repos);
   const repo = repos[names[Math.floor(Math.random() * names.length)]];
-  const columns = Object.keys(columnTasks);
-  const column = columns[Math.floor(Math.random() * columns.length)];
-  const change = [
-    () => (repo.reviewRequested += 1),
-    () => (repo.reviewRequested = Math.max(0, repo.reviewRequested - 1)),
-    () => (repo.PRs += 1),
-    () => (repo.todaysMergedPRs += 1),
-    () => (repo.branch = BRANCHES[Math.floor(Math.random() * BRANCHES.length)]),
-    () => (columnTasks.TO_DO += 1),
-    () => (columnTasks[column] = Math.max(0, columnTasks[column] + (Math.random() < 0.5 ? -1 : 1))),
-  ];
-  change[Math.floor(Math.random() * change.length)]();
+  const keys = Object.keys(CHANGES);
+  const change = CHANGES[name] ?? CHANGES[keys[Math.floor(Math.random() * keys.length)]];
+  change(repo);
 }
 
 function sum() {
@@ -64,7 +79,9 @@ function sum() {
   const asanaBoards = {};
   for (const board of tracked.asana.values()) {
     for (const [kind, column] of Object.entries(board.columns ?? {})) {
-      if (column) asanaBoards[kind] = { matchedColumnName: column, tasks: columnTasks[kind] };
+      if (column) {
+        asanaBoards[kind] = { matchedColumnName: column, tasks: columnTasks[kind], todaysCreatedTasks: createdToday[kind] };
+      }
     }
   }
   return { gitRepos, asanaBoards };
@@ -104,7 +121,9 @@ const server = createServer(async (req, res) => {
 
   // Not part of crtboardd: forces a change, e.g. to watch something flash.
   if (req.method === "POST" && url.pathname === "/mock/mutate") {
-    mutate();
+    const name = url.searchParams.get("change");
+    if (name && !CHANGES[name]) return send(res, 400, { error: `change must be one of ${Object.keys(CHANGES).join(", ")}` });
+    mutate(name);
     return send(res, 200, sum());
   }
 

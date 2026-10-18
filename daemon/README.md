@@ -75,13 +75,16 @@ headers so the GitHub Pages copy can reach it:
   HEAD shows its short commit id.
 - **PRs**, **reviewRequested**, **todaysMergedPRs**: GitHub searches through
   `gh api graphql` every minute, for the `origin` remote's repository. PRs are
-  open (including drafts) or merged ones opened by, or awaiting review from,
-  a `githubUsernames` member, each counted once; review requests count open or
+  the ones waiting to be merged (open, including drafts) that were opened by,
+  or await review from, a `githubUsernames` member, each counted once; review
+  requests count open or
   merged PRs awaiting review from one of them; today's merges count from local
   midnight. A repository without a GitHub remote reports 0.
 - **Tasks**: Asana's Events API is checked every 30 seconds and the matched
   sections are recounted when the board changed (and every 5 minutes anyway).
   Columns count their incomplete tasks; DONE counts tasks completed today.
+  Every column also reports `todaysCreatedTasks`, the tasks in it created
+  today, which is how crtboard-web notices a new task in any column.
 
 A repository or column is left out of the event until its numbers are known,
 so crtboard-web never mistakes a placeholder 0 for a change.

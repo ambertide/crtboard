@@ -1,7 +1,8 @@
 <!--
   @component
-  Figma `Review Requests`: how many of a repository's PRs are waiting on a
-  review from the tracked users; dimmed when there are none.
+  Figma `Review Requests`: how many of a repository's PRs, opened by or
+  awaiting review from the tracked users, are still waiting to be merged;
+  dimmed when there are none.
 -->
 <script lang="ts">
   import Icon from "../../lib/icons/Icon.svelte";
