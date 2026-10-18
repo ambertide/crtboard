@@ -12,6 +12,9 @@ npm run mock     # stand-in crtboardd on http://localhost:7777
 npm run dev      # the app, talking to localhost:7777
 ```
 
+`npm run mock` is a stand-in; the real daemon is
+[crtboardd](../../daemon/README.md) (`crtboardctl start`), on the same port.
+
 `npm run check` type-checks, `npm test` runs the unit tests and
 `npm run build` writes the static bundle to `dist/`.
 
