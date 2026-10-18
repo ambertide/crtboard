@@ -61,6 +61,16 @@ def test_start_status_logs_stop(started):
         httpx.get(f"http://127.0.0.1:{port}/resources/available")
 
 
+def test_stops_promptly_with_a_browser_connected(started):
+    path, port = started
+    with httpx.stream("GET", f"http://127.0.0.1:{port}/events", timeout=30) as events:
+        assert next(events.iter_lines()) == "event: CRTBOARD_EVENT_SUM"
+        began = time.monotonic()
+        stopped = ctl("stop")
+    assert "stopped" in stopped.stdout and "killed" not in stopped.stdout
+    assert time.monotonic() - began < 8
+
+
 def test_only_one_instance_runs(started, tmp_path):
     path, port = started
     again = ctl("start", "--config", str(path))

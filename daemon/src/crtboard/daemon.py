@@ -27,6 +27,7 @@ from .store import Store
 from .summary import Poller
 
 log = logging.getLogger("crtboardd")
+SHUTDOWN_GRACE_S = 2
 
 
 class AlreadyRunning(Exception):
@@ -127,8 +128,15 @@ def main(argv: list[str] | None = None) -> int:
                 config.port,
                 os.getpid(),
             )
+            # The event stream never ends on its own, so an open browser tab would
+            # otherwise hold up shutdown until crtboardctl gives up and kills us.
             server = uvicorn.Server(
-                uvicorn.Config(create_app(poller, store), log_config=None, access_log=False)
+                uvicorn.Config(
+                    create_app(poller, store),
+                    log_config=None,
+                    access_log=False,
+                    timeout_graceful_shutdown=SHUTDOWN_GRACE_S,
+                )
             )
             server.run(sockets=sockets)
             log.info("crtboardd stopped")
