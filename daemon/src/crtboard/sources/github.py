@@ -16,9 +16,8 @@ GH_TIMEOUT_S = 30
 Runner = Callable[[list[str]], str]
 
 _QUERY = """
-query($open: String!, $merged: String!, $reviewOpen: String!, $reviewMerged: String!, $today: String!) {
+query($open: String!, $reviewOpen: String!, $reviewMerged: String!, $today: String!) {
   open: search(query: $open, type: ISSUE_ADVANCED, first: 0) { issueCount }
-  merged: search(query: $merged, type: ISSUE_ADVANCED, first: 0) { issueCount }
   reviewOpen: search(query: $reviewOpen, type: ISSUE_ADVANCED, first: 0) { issueCount }
   reviewMerged: search(query: $reviewMerged, type: ISSUE_ADVANCED, first: 0) { issueCount }
   today: search(query: $today, type: ISSUE_ADVANCED, first: 0) { issueCount }
@@ -56,9 +55,8 @@ class GitHub:
         reviews = _any_of("review-requested", self.users)
         base = f"repo:{slug} is:pr"
         return {
-            # Open covers drafts; with merged ones this is "open, merged or draft".
+            # Open covers drafts: the PRs still waiting to be merged.
             "open": f"{base} is:open {involved}",
-            "merged": f"{base} is:merged {involved}",
             "reviewOpen": f"{base} is:open {reviews}",
             "reviewMerged": f"{base} is:merged {reviews}",
             "today": f"{base} is:merged merged:>={day_start.isoformat(timespec='seconds')} {involved}",
@@ -74,7 +72,7 @@ class GitHub:
         data = json.loads(self._run(args))["data"]
         count = {name: result["issueCount"] for name, result in data.items()}
         return PullRequestCounts(
-            prs=count["open"] + count["merged"],
+            prs=count["open"],
             review_requested=count["reviewOpen"] + count["reviewMerged"],
             todays_merged=count["today"],
         )

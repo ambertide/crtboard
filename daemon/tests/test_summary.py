@@ -35,7 +35,7 @@ def test_lists_configured_repositories(tmp_path, repos):
 
 
 def test_a_repository_appears_only_once_its_counts_are_known(tmp_path, repos):
-    gh = FakeGh({"open": 2, "merged": 5, "reviewOpen": 1, "today": 1})
+    gh = FakeGh({"open": 7, "reviewOpen": 1, "today": 1})
     p, store = poller(tmp_path, repos, gh)
     store.track_repo("beemu")
     store.track_repo("local-only")
@@ -82,8 +82,8 @@ def test_board_columns_are_counted_and_recounted_on_events(tmp_path, repos, fake
     )
     refresh(p)
     assert p.summary()["asanaBoards"] == {
-        "todo": {"matchedColumnName": "Will Do", "tasks": 3},
-        "done": {"matchedColumnName": "Done", "tasks": 1},
+        "todo": {"matchedColumnName": "Will Do", "tasks": 3, "todaysCreatedTasks": 0},
+        "done": {"matchedColumnName": "Done", "tasks": 1, "todaysCreatedTasks": 0},
     }
 
     fake_asana.tasks["s1"].append({"completed": False})
@@ -103,4 +103,33 @@ def test_rematching_a_column_recounts_at_once(tmp_path, repos, fake_asana):
     refresh(p)
     store.update_board(board, "Team Board", {"TO_DO": "Ongoing"})
     asyncio.run(p.refresh_tasks())
-    assert p.summary()["asanaBoards"]["todo"] == {"matchedColumnName": "Ongoing", "tasks": 8}
+    assert p.summary()["asanaBoards"]["todo"] == {
+        "matchedColumnName": "Ongoing",
+        "tasks": 8,
+        "todaysCreatedTasks": 0,
+    }
+
+
+def test_a_task_created_outside_to_do_is_still_reported(tmp_path, repos, fake_asana):
+    """What happened on a real board: a task was added to In progress while
+    another moved from In progress to Done, so no column count went up."""
+    fake_asana.tasks["s1"] = [{"completed": False, "created_at": "2026-10-18T08:00:00Z"}] * 3
+    fake_asana.tasks["s2"] = [{"completed": False, "created_at": "2026-10-18T08:00:00Z"}] * 2
+    p, store = poller(tmp_path, repos, asana=Asana("secret-token", transport=fake_asana.transport()))
+    columns = {"TO_DO": "Will Do", "BLOCKED": None, "IN_PROGRESS": "Ongoing", "DONE": "Done"}
+    store.track_board("Team Board", columns)
+    refresh(p)
+    before = p.summary()["asanaBoards"]
+
+    finished = fake_asana.tasks["s2"].pop()
+    fake_asana.tasks["s3"].append({**finished, "completed": True, "completed_at": "2026-10-18T11:54:00Z"})
+    fake_asana.tasks["s2"].append({"completed": False, "created_at": "2026-10-18T11:54:00Z"})
+    fake_asana.pending_events["p1"] = [{"action": "added"}, {"action": "changed"}]
+    asyncio.run(p.refresh_tasks())
+    after = p.summary()["asanaBoards"]
+
+    assert [after[k]["tasks"] for k in ("todo", "inProgress")] == [
+        before[k]["tasks"] for k in ("todo", "inProgress")
+    ]
+    created = sum(c["todaysCreatedTasks"] for c in after.values())
+    assert created == sum(c["todaysCreatedTasks"] for c in before.values()) + 1
