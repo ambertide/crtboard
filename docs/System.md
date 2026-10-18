@@ -117,7 +117,8 @@ For these reasons connected server can use the Rest API thus:
     "asanaBoards": {
         "todo": {
             "matchedColumnName": "Will Do",
-            "tasks": 25
+            "tasks": 25,
+            "todaysCreatedTasks": 2
         }
         ...
     }
@@ -133,13 +134,16 @@ These are calculated by:
   * Number of total tasks in the selected columns for each column
   * Except for `DONE` column, since this column will always grow,
     we only store the tasks that were done in this day.
+  * `todaysCreatedTasks`, the number of tasks in the column that were
+    created today, wherever they were created, so a new task is noticed
+    even when it lands outside `TO_DO` or a move hides it from the counts.
 * For `gitRepos`
   * Current active branch of the repository for each repository.
-  * Current PRs, number of PRs either opened by or whose review was
-    requested for in the list of `githubUsernames`, these can be
-    open, merged or draft. If a PR is both opened by a member of this
-    array and review is requested to one of them, it is deduplicated,
-    so it is counted only once.
+  * Current PRs, number of PRs waiting to be merged, either opened by
+    or whose review was requested for in the list of `githubUsernames`,
+    these can be open or draft. If a PR is both opened by a member of
+    this array and review is requested to one of them, it is
+    deduplicated, so it is counted only once.
   * `reviewRequested` which tracks the number of open, draft or merged
     PRs which have a review request to one or more `githubUsernames`
     members, these are counted even if they were counted in the above
