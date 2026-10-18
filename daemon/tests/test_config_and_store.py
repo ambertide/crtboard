@@ -45,6 +45,18 @@ def test_rejects_bad_values(tmp_path, text, message):
         load_config(path)
 
 
+def test_asana_key_from_the_environment_or_secrets_file(tmp_path, crtboard_home):
+    path = tmp_path / ".crtboard.yaml"
+    path.write_text("port: 7777\n")
+    assert load_config(path, env={}).asana_api_key is None
+    assert load_config(path, env={"ASANA_API_KEY": "from-env"}).asana_api_key == "from-env"
+
+    (crtboard_home / "secrets.env").write_text("# written by bb\nexport ASANA_API_KEY='from-file'\n")
+    assert load_config(path, env={}).asana_api_key == "from-file"
+    path.write_text("asana-api-key: from-yaml\n")
+    assert load_config(path, env={"ASANA_API_KEY": "from-env"}).asana_api_key == "from-yaml"
+
+
 def test_missing_file(tmp_path):
     with pytest.raises(ConfigError, match="does not exist"):
         load_config(tmp_path / "nope.yaml")

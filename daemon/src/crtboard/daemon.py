@@ -91,6 +91,8 @@ def setup_logging(log_file: Path, foreground: bool) -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s", handlers=handlers
     )
+    # Every Asana poll would otherwise log a line; failures are reported by the poller.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 def main(argv: list[str] | None = None) -> int:

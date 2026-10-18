@@ -24,5 +24,9 @@ def log_file() -> Path:
     return state_dir() / "crtboardd.log"
 
 
+def secrets_file() -> Path:
+    return state_dir() / "secrets.env"
+
+
 def database() -> Path:
     return state_dir() / "crtboard.db"

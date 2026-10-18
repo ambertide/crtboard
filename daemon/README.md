@@ -32,6 +32,10 @@ asana-api-key: 1/12345...  # an Asana personal access token
 port: 7777                 # optional; crtboard-web expects 7777 by default
 ```
 
+The Asana token can stay out of the YAML: when `asana-api-key` is missing,
+`ASANA_API_KEY` is read from the environment, then from
+`~/.crtboard/secrets.env` (`ASANA_API_KEY=...`, readable only by you).
+
 Every key is optional: without `githubUsernames` PR counts stay 0, without
 `asana-api-key` no boards are offered.
 
