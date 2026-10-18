@@ -6,7 +6,7 @@ in an old CRT monitor supporting the European PAL format.
 
 * CRTBOARD is a system of three distinct software parts:
   * `crtboardd`: Used to get data from your local computer and serve
-    it over the web using `go` so that the rest of the system can reach it.
+    it over the web using `python` so that the rest of the system can reach it.
   * `crtboard-web`: The web ui you can use to edit the look and
     feel of your crt-dashboard
   * `crt-display`: a go script deployed to a Raspberry Pi
@@ -63,7 +63,7 @@ stopped with the `crtboardctl` command, during its startup, another
 * `asana-api-key` your api key to asana so that `crtboard` can
   query your boards, and tasks.
 * `githubUsernames` for whose PRs to track
-* `port` the port by which the `crtboardd` is served.
+* `port` the port by which the `crtboardd` is served, `7777` by default.
 `crtboardd` requires `go` and `gh` to exist in your system, and your
 `gh` executable to be logged in, in addition `git` is required so
 that `crtboardd` can listen to your repositories.
@@ -93,9 +93,12 @@ For these reasons connected server can use the Rest API thus:
       are shown in the ui, with following enums: `"BLOCKED"`, `"DONE"`,
       `"IN_PROGRESS"` and `"TO_DO"`
 * These resources are given IDs so the client may `PUT`
-  `resources/#resource/tracked/#id` to update them.
+  `resources/#resource/tracked/#id` to update them, or `DELETE` it to
+  stop tracking them. An unknown id is answered with `404`, after which
+  the client tracks the resource anew. Only one board is tracked at a
+  time, so tracking a board replaces the previous one.
 * Once these connections are established, the server will start
-  sending Server Sent Events.
+  sending Server Sent Events from `/events`.
 * Periodically, the daemon will send, `CRTBOARD_EVENT_SUM` events, 
   even if the payload does not change, which have the following JSON 
   shape:
@@ -120,6 +123,9 @@ For these reasons connected server can use the Rest API thus:
     }
 }
 ```
+
+`asanaBoards` is keyed `todo`, `blocked`, `inProgress` and `done`, for
+the `TO_DO`, `BLOCKED`, `IN_PROGRESS` and `DONE` columns that are matched.
 
 These are calculated by:
 
