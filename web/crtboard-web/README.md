@@ -51,12 +51,15 @@ makes the mock change something right away, to watch the dashboard flash.
 - Status priority: repeating event, Review Requested, Pull Request Created,
   Merged, Task Created, Nominal. They are raised when, between two
   `CRTBOARD_EVENT_SUM` events, a tracked repository's `reviewRequested`,
-  `PRs` or `todaysMergedPRs` rises, or the To Do column (still matched to the
-  same Asana column) gains tasks. A raised status stays, flashing, for 5
+  `PRs` or `todaysMergedPRs` rises, or the board's `todaysCreatedTasks`
+  (summed over columns still matched to the same Asana columns) rises, so a
+  new task counts in any column. A raised status stays, flashing, for 5
   minutes.
 - A repeating event appears 10 minutes before it starts, flashing, with a
   `t - 08M 06S` style countdown, and stays steady for 10 minutes after.
-- When Nominal returns, or the deployment advice, a review-request count, a
+- The footer's "PRs Waiting for Merge" is `PRs`: open PRs (drafts included)
+  opened by, or awaiting review from, the tracked users.
+- When Nominal returns, or the deployment advice, an open-PR count, a
   branch or a task count changes, it flashes gray-50/gray-400, a second
   each, for six seconds. The clock and the countdown never flash.
 - The deployment advice under Nominal follows [Prompts/011_Deploys.md](../../Prompts/011_Deploys.md):
