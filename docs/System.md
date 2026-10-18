@@ -105,6 +105,7 @@ For these reasons connected server can use the Rest API thus:
     "gitRepos": {
         "repoName": {
             "PRs": 34,
+            "todaysMergedPRs": 0,
             "branch": "feat/tokenizer/add-ld",
             "reviewRequested": 5
         }
@@ -137,6 +138,7 @@ These are calculated by:
     PRs which have a review request to one or more `githubUsernames`
     members, these are counted even if they were counted in the above
     number.
+  * `todaysMergedPRs` track the number of merged PRs today
 
 ## `crtboard-web`
 
